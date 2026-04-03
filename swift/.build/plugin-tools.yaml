@@ -1,0 +1,168 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "Example-arm64-apple-macosx15.0-debug.module": ["<Example-arm64-apple-macosx15.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "ZeroMcp-arm64-apple-macosx15.0-debug.module": ["<ZeroMcp-arm64-apple-macosx15.0-debug.module>"]
+  "ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.module": ["<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.module>"]
+  "ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test": ["<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test>"]
+  "ZeroMcpTests-arm64-apple-macosx15.0-debug.module": ["<ZeroMcpTests-arm64-apple-macosx15.0-debug.module>"]
+  "main": ["<Example-arm64-apple-macosx15.0-debug.module>","<ZeroMcp-arm64-apple-macosx15.0-debug.module>","<zeromcp-example-arm64-apple-macosx15.0-debug.exe>"]
+  "test": ["<Example-arm64-apple-macosx15.0-debug.module>","<ZeroMcp-arm64-apple-macosx15.0-debug.module>","<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test>","<ZeroMcpTests-arm64-apple-macosx15.0-debug.module>","<zeromcp-example-arm64-apple-macosx15.0-debug.exe>"]
+  "zeromcp-example-arm64-apple-macosx15.0-debug.exe": ["<zeromcp-example-arm64-apple-macosx15.0-debug.exe>"]
+default: "main"
+nodes:
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/Example/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Tests/ZeroMcpTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example":
+    is-mutated: true
+commands:
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/Example/main.swift"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Schema.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Server.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Tool.swift"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.derived/runner.swift"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/sources"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.derived/runner.swift"]
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/SchemaTests.swift.o"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.product/Objects.LinkFileList"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Tests/ZeroMcpTests/SchemaTests.swift"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/sources"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/sources"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist"
+
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/main.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList"
+
+  "<Example-arm64-apple-macosx15.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/main.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/Example.swiftmodule"]
+    outputs: ["<Example-arm64-apple-macosx15.0-debug.module>"]
+
+  "<ZeroMcp-arm64-apple-macosx15.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"]
+    outputs: ["<ZeroMcp-arm64-apple-macosx15.0-debug.module>"]
+
+  "<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpPackageTests.swiftmodule"]
+    outputs: ["<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.module>"]
+
+  "<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test>":
+    tool: phony
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.xctest/Contents/MacOS/ZeroMcpPackageTests"]
+    outputs: ["<ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test>"]
+
+  "<ZeroMcpTests-arm64-apple-macosx15.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/SchemaTests.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpTests.swiftmodule"]
+    outputs: ["<ZeroMcpTests-arm64-apple-macosx15.0-debug.module>"]
+
+  "<zeromcp-example-arm64-apple-macosx15.0-debug.exe>":
+    tool: phony
+    inputs: ["<zeromcp-example-arm64-apple-macosx15.0-debug.exe-CodeSigning>"]
+    outputs: ["<zeromcp-example-arm64-apple-macosx15.0-debug.exe>"]
+
+  "C.Example-arm64-apple-macosx15.0-debug.module":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/Example/main.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/main.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/Example.swiftmodule"]
+    description: "Compiling Swift Module 'Example' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","Example","-emit-dependencies","-emit-module","-emit-module-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/Example.swiftmodule","-output-file-map","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/output-file-map.json","-incremental","-c","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources","-I","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","Example_main","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swift"]
+
+  "C.ZeroMcp-arm64-apple-macosx15.0-debug.module":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Schema.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Server.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Tool.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"]
+    description: "Compiling Swift Module 'ZeroMcp' (4 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ZeroMcp","-emit-dependencies","-emit-module","-emit-module-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule","-output-file-map","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources","-I","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/include/ZeroMcp-Swift.h","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swift"]
+
+  "C.ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.module":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.derived/runner.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpTests.swiftmodule","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/sources"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'ZeroMcpPackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ZeroMcpPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpPackageTests.swiftmodule","-output-file-map","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/sources","-I","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/include/ZeroMcpPackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swift"]
+
+  "C.ZeroMcpPackageTests-arm64-apple-macosx15.0-debug.test":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/SchemaTests.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.xctest/Contents/MacOS/ZeroMcpPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.xctest/Contents/MacOS/ZeroMcpPackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug","-o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.xctest/Contents/MacOS/ZeroMcpPackageTests","-module-name","ZeroMcpPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpPackageTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpTests.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.ZeroMcpTests-arm64-apple-macosx15.0-debug.module":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/Tests/ZeroMcpTests/SchemaTests.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/sources"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/SchemaTests.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpTests.swiftmodule"]
+    description: "Compiling Swift Module 'ZeroMcpTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ZeroMcpTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcpTests.swiftmodule","-output-file-map","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpTests.build/sources","-I","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swift"]
+
+  "C.zeromcp-example-arm64-apple-macosx15.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/main.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList"]
+    outputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/zeromcp-example"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug","-o","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example","-module-name","zeromcp_example","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_Example_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx13.0","-Xlinker","-add_ast_path","-Xlinker","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/Example.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.zeromcp-example-arm64-apple-macosx15.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist"]
+    outputs: ["<zeromcp-example-arm64-apple-macosx15.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/zeromcp-example"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist","/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/Example/","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Tests/ZeroMcpTests/","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Package.swift","/Users/chriswelker/Projects/antidrift/zeromcp/swift/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

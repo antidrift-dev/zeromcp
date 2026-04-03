@@ -1,0 +1,42 @@
+{
+  "name": "zeromcp",
+  "version": "0.1.0",
+  "description": "Zero-config MCP server. Drop a JS file in a folder, it's a tool.",
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "bin": {
+    "mcp": "./bin/mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
+    },
+    "./scanner": {
+      "types": "./dist/scanner.d.ts",
+      "import": "./dist/scanner.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "mcp",
+    "zero-config",
+    "serverless",
+    "tools",
+    "ai-agents"
+  ],
+  "author": "",
+  "license": "ISC"
+}

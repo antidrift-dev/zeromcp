@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeromcp"
+version = "0.1.0"
+description = "Zero-config MCP server. Drop a .py file in a folder, it's a tool."
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["mcp", "zero-config", "serverless", "tools", "ai-agents"]
+
+[project.scripts]
+zeromcp = "zeromcp.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["zeromcp*"]

@@ -1,0 +1,479 @@
+{
+  "tests": [
+    {
+      "name": "initialize",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": { "name": "conformance-test", "version": "1.0" }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": { "tools": {} },
+          "serverInfo": { "name": "zeromcp" }
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "initialized_notification",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "expect": null,
+      "match": "silent"
+    },
+    {
+      "name": "ping",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ping"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {}
+      },
+      "match": "exact"
+    },
+    {
+      "name": "tools_list_contains_hello",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/list",
+        "params": {}
+      },
+      "expect_tools": [
+        {
+          "name": "hello",
+          "description": "Say hello to someone",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            },
+            "required": ["name"]
+          }
+        },
+        {
+          "name": "add",
+          "description": "Add two numbers together",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "a": { "type": "number" },
+              "b": { "type": "number" }
+            },
+            "required": ["a", "b"]
+          }
+        }
+      ],
+      "match": "tools"
+    },
+    {
+      "name": "tools_list_has_correct_count",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/list",
+        "params": {}
+      },
+      "expect_min_tools": 2,
+      "match": "tool_count"
+    },
+    {
+      "name": "tools_list_all_have_required_fields",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/list",
+        "params": {}
+      },
+      "match": "tool_structure"
+    },
+    {
+      "name": "call_hello_basic",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "World" }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "content": [{ "type": "text", "text": "Hello, World!" }]
+        }
+      },
+      "match": "exact"
+    },
+    {
+      "name": "call_hello_special_chars",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "O'Brien & Co \"quoted\"" }
+        }
+      },
+      "expect_content_contains": "O'Brien & Co \"quoted\"",
+      "match": "content_contains"
+    },
+    {
+      "name": "call_hello_unicode",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "世界" }
+        }
+      },
+      "expect_content_contains": "世界",
+      "match": "content_contains"
+    },
+    {
+      "name": "call_hello_empty_string",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "" }
+        }
+      },
+      "expect_no_error": true,
+      "match": "no_error"
+    },
+    {
+      "name": "call_add_integers",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": 3, "b": 4 }
+        }
+      },
+      "expect_content_json": { "sum": 7 },
+      "match": "content_json"
+    },
+    {
+      "name": "call_add_floats",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": 1.5, "b": 2.5 }
+        }
+      },
+      "expect_content_json": { "sum": 4.0 },
+      "match": "content_json"
+    },
+    {
+      "name": "call_add_negative",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": -10, "b": 3 }
+        }
+      },
+      "expect_content_json": { "sum": -7 },
+      "match": "content_json"
+    },
+    {
+      "name": "call_add_zero",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 23,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": 0, "b": 0 }
+        }
+      },
+      "expect_content_json": { "sum": 0 },
+      "match": "content_json"
+    },
+    {
+      "name": "call_add_large_numbers",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 24,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": 999999999, "b": 1 }
+        }
+      },
+      "expect_content_json": { "sum": 1000000000 },
+      "match": "content_json"
+    },
+    {
+      "name": "error_unknown_tool",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 30,
+        "method": "tools/call",
+        "params": {
+          "name": "nonexistent",
+          "arguments": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 30,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "error_unknown_tool_has_message",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 31,
+        "method": "tools/call",
+        "params": {
+          "name": "nonexistent",
+          "arguments": {}
+        }
+      },
+      "expect_content_contains": "nonexistent",
+      "match": "content_contains"
+    },
+    {
+      "name": "validation_wrong_type",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 40,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": { "a": "not a number", "b": 4 }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 40,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "validation_missing_required",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 41,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 41,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "validation_missing_all_required",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 42,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 42,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "validation_extra_fields_allowed",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 43,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "World", "extra": "ignored" }
+        }
+      },
+      "expect_content_contains": "Hello, World!",
+      "match": "content_contains"
+    },
+    {
+      "name": "validation_null_arguments",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 44,
+        "method": "tools/call",
+        "params": {
+          "name": "hello"
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 44,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "unknown_method_with_id",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 50,
+        "method": "fake/method",
+        "params": {}
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 50,
+        "error": {
+          "code": -32601
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "unknown_notification_no_response",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/unknown"
+      },
+      "expect": null,
+      "match": "silent"
+    },
+    {
+      "name": "response_preserves_id_type_int",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 99,
+        "method": "ping"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 99,
+        "result": {}
+      },
+      "match": "exact"
+    },
+    {
+      "name": "response_preserves_id_type_string",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": "abc-123",
+        "method": "ping"
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": "abc-123",
+        "result": {}
+      },
+      "match": "exact"
+    },
+    {
+      "name": "response_always_has_jsonrpc",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 60,
+        "method": "tools/list",
+        "params": {}
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 60
+      },
+      "match": "partial"
+    },
+    {
+      "name": "result_content_is_array",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 70,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "test" }
+        }
+      },
+      "match": "content_is_array"
+    },
+    {
+      "name": "result_content_item_has_type_and_text",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 71,
+        "method": "tools/call",
+        "params": {
+          "name": "hello",
+          "arguments": { "name": "test" }
+        }
+      },
+      "match": "content_shape"
+    },
+    {
+      "name": "call_with_empty_arguments_object",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 80,
+        "method": "tools/call",
+        "params": {
+          "name": "add",
+          "arguments": {}
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 80,
+        "result": {
+          "isError": true
+        }
+      },
+      "match": "partial"
+    }
+  ]
+}

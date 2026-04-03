@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative '../lib/zeromcp'
+
+command = ARGV[0]
+tools_dir = ARGV[1]
+
+case command
+when 'serve'
+  config = ZeroMcp::Config.load
+  config = ZeroMcp::Config.new('tools' => tools_dir) if tools_dir
+  server = ZeroMcp::Server.new(config)
+  server.serve
+when 'audit'
+  # TODO
+  $stderr.puts '[zeromcp] audit not yet implemented for Ruby'
+else
+  $stderr.puts 'Usage:'
+  $stderr.puts '  zeromcp serve [tools-directory]'
+  $stderr.puts '  zeromcp audit [tools-directory]'
+  exit 1
+end

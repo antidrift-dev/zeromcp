@@ -1,0 +1,11 @@
+{
+  "transport": [
+    { "type": "stdio" },
+    { "type": "http", "port": 4242 }
+  ],
+  "logging": true,
+  "bypass_permissions": false,
+  "credentials": {
+    "attio": { "env": "ATTIO_API_KEY" }
+  }
+}

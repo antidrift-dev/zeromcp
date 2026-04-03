@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/master.swiftdeps"
+  },
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.d",
+    "object": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/runner.dia"
+  }
+}
