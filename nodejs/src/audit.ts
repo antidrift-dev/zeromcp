@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { readdir } from 'fs/promises';
-import { join, extname, relative, resolve } from 'path';
+import { readFileSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
+import { join, extname, relative, resolve } from 'node:path';
 import type { ToolSource } from './config.js';
 import { resolveToolSources } from './config.js';
 

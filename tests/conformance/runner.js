@@ -16,10 +16,10 @@
  *   node runner.js ../../go/zeromcp serve ../../go/examples/tools
  */
 
-import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = JSON.parse(readFileSync(join(__dirname, 'fixtures.json'), 'utf8'));

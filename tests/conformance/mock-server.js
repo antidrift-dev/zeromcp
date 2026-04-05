@@ -6,7 +6,7 @@
  * Starts on port 18923 by default.
  */
 
-import { createServer } from 'http';
+import { createServer } from 'node:http';
 
 const PORT = parseInt(process.env.MOCK_PORT || '18923', 10);
 

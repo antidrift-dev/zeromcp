@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'child_process';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN = resolve(__dirname, '../bin/mcp.js');

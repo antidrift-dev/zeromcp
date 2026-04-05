@@ -10,11 +10,11 @@
  *   3. Scores: survived / degraded / crashed / corrupted
  */
 
-import { spawn } from 'child_process';
-import { createInterface } from 'readline';
-import { readFileSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');

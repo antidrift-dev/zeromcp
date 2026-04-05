@@ -1,5 +1,5 @@
-import { createInterface } from 'readline';
-import { createServer } from 'http';
+import { createInterface } from 'node:readline';
+import { createServer } from 'node:http';
 import { ToolScanner, type ToolDefinition } from './scanner.js';
 import { RemoteManager } from './remote.js';
 import { loadConfig, resolveTransports, resolveAuth, type Config, type TransportConfig } from './config.js';

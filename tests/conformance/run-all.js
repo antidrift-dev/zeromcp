@@ -5,11 +5,11 @@
  * Runs multiple test suites against all implementations.
  */
 
-import { spawn, fork } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import { createInterface } from 'readline';
+import { spawn, fork } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');
@@ -225,7 +225,7 @@ const suites = [
 // Mock HTTP server for sandbox tests
 // ---------------------------------------------------------------------------
 
-import { createServer } from 'http';
+import { createServer } from 'node:http';
 
 let mockServer;
 

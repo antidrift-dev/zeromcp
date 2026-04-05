@@ -1,6 +1,6 @@
-import { readFile, readFileSync } from 'fs';
-import { readFile as readFileAsync } from 'fs/promises';
-import { resolve, dirname } from 'path';
+import { readFile, readFileSync } from 'node:fs';
+import { readFile as readFileAsync } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
 
 export interface RemoteServer {
   name: string;

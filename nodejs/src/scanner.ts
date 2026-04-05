@@ -1,6 +1,6 @@
-import { readdir, watch } from 'fs/promises';
-import { join, basename, extname, relative, resolve } from 'path';
-import { pathToFileURL } from 'url';
+import { readdir, watch } from 'node:fs/promises';
+import { join, basename, extname, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { InputSchema } from './schema.js';
 import type { Config, NamespaceOverride, CredentialSource, ToolSource } from './config.js';
 import { resolveCredentials, resolveToolSources } from './config.js';
