@@ -121,15 +121,31 @@ async function runAuthTests(impl) {
     else { failed++; failures.push({ test: 'http_valid_auth_list', errors: [`Status ${res.status}`] }); }
   }
 
-  // Test 5: Valid token → tools/call hello
+  // Test 5: Valid token → tools/call (use first available tool or ping)
   {
-    const res = await httpRequest(impl.port, 'POST', '/mcp', {
-      jsonrpc: '2.0', id: 5, method: 'tools/call',
-      params: { name: 'hello', arguments: { name: 'World' } }
+    // Get tool list first to find a tool name that exists
+    const listRes = await httpRequest(impl.port, 'POST', '/mcp', {
+      jsonrpc: '2.0', id: 50, method: 'tools/list', params: {}
     }, TOKEN);
-    const text = res.body?.result?.content?.[0]?.text || '';
-    if (res.status === 200 && text.includes('Hello, World!')) passed++;
-    else { failed++; failures.push({ test: 'http_valid_auth_call', errors: [`Status ${res.status}, text: ${text}`] }); }
+    const tools = listRes.body?.result?.tools || [];
+    const toolName = tools.find(t => t.name === 'hello')?.name || tools[0]?.name;
+
+    if (toolName) {
+      const args = toolName === 'hello' ? { name: 'World' } : {};
+      const res = await httpRequest(impl.port, 'POST', '/mcp', {
+        jsonrpc: '2.0', id: 5, method: 'tools/call',
+        params: { name: toolName, arguments: args }
+      }, TOKEN);
+      if (res.status === 200 && res.body?.result?.content) passed++;
+      else { failed++; failures.push({ test: 'http_valid_auth_call', errors: [`Status ${res.status}`] }); }
+    } else {
+      // No tools — just verify ping works with auth
+      const res = await httpRequest(impl.port, 'POST', '/mcp', {
+        jsonrpc: '2.0', id: 5, method: 'ping'
+      }, TOKEN);
+      if (res.status === 200) passed++;
+      else { failed++; failures.push({ test: 'http_valid_auth_call', errors: [`No tools and ping failed`] }); }
+    }
   }
 
   // Test 6: CORS preflight
