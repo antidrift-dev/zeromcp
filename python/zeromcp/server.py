@@ -169,7 +169,7 @@ async def _call_tool(tools: dict, params: dict, execute_timeout: float = 30) -> 
         if isinstance(result, str):
             text = result
         else:
-            text = json.dumps(result, indent=2, default=str)
+            text = json.dumps(result, default=str)
         return {"content": [{"type": "text", "text": text}]}
     except asyncio.TimeoutError:
         return {

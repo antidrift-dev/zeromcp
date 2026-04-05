@@ -240,7 +240,7 @@ public class ZeroMcpServer
             var result = await executeTask;
             var text = result is string s
                 ? s
-                : JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+                : JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = false });
 
             return new Dictionary<string, object>
             {

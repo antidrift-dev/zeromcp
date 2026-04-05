@@ -164,7 +164,7 @@ class Server
                 ];
             }
 
-            $text = is_string($result) ? $result : json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $text = is_string($result) ? $result : json_encode($result, JSON_UNESCAPED_SLASHES);
             return ['content' => [['type' => 'text', 'text' => $text]]];
         } catch (\RuntimeException $e) {
             if ($e->getMessage() === '__ZEROMCP_TIMEOUT__') {

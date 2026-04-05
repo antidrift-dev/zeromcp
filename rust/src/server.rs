@@ -239,7 +239,7 @@ impl Server {
                 let text = if result.is_string() {
                     result.as_str().unwrap().to_string()
                 } else {
-                    serde_json::to_string_pretty(&result).unwrap_or_default()
+                    serde_json::to_string(&result).unwrap_or_default()
                 };
                 json!({
                     "content": [{ "type": "text", "text": text }]

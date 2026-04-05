@@ -185,7 +185,7 @@ public class ZeroMcp {
                 text = s
             } else if let data = try? JSONSerialization.data(
                 withJSONObject: result,
-                options: [.sortedKeys]
+                options: []
             ) {
                 text = String(data: data, encoding: .utf8) ?? "\(result)"
             } else {

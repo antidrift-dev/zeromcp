@@ -406,7 +406,7 @@ func (s *Server) callTool(params map[string]any) map[string]any {
 	case string:
 		text = v
 	default:
-		b, _ := json.MarshalIndent(result, "", "  ")
+		b, _ := json.Marshal(result)
 		text = string(b)
 	}
 

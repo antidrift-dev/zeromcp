@@ -285,7 +285,7 @@ async function callTool(
 
   try {
     const result = await withTimeout(tool.execute(args), timeout, name);
-    const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+    const text = typeof result === 'string' ? result : JSON.stringify(result);
     return {
       content: [{ type: 'text', text }],
     };

@@ -148,7 +148,7 @@ module ZeroMcp
                        @config.execute_timeout
 
         result = Timeout.timeout(timeout_secs) { tool.call(args, ctx) }
-        text = result.is_a?(String) ? result : JSON.pretty_generate(result)
+        text = result.is_a?(String) ? result : JSON.generate(result)
         { 'content' => [{ 'type' => 'text', 'text' => text }] }
       rescue Timeout::Error
         { 'content' => [{ 'type' => 'text', 'text' => "Tool \"#{name}\" timed out after #{timeout_secs}s" }], 'isError' => true }
