@@ -1,3 +1,0 @@
-module ZeroMcp {
-    header "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/include/ZeroMcp-Swift.h"
-}

@@ -1,3 +1,0 @@
-module ZeroMcpPackageTests {
-    header "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcpPackageTests.build/include/ZeroMcpPackageTests-Swift.h"
-}
