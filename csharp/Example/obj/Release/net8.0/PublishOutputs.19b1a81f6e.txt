@@ -1,7 +1,0 @@
-/tmp/out/Example
-/tmp/out/Example.dll
-/tmp/out/Example.deps.json
-/tmp/out/Example.runtimeconfig.json
-/tmp/out/Example.pdb
-/tmp/out/ZeroMcp.dll
-/tmp/out/ZeroMcp.pdb
