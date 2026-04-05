@@ -1,8 +1,0 @@
-{
-    "name": "example/mcp-server",
-    "description": "Minimal MCP server using the official PHP SDK",
-    "require": {
-        "php": ">=8.1",
-        "mcp/sdk": "^0.4.0"
-    }
-}
