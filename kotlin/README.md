@@ -32,6 +32,39 @@ The official Kotlin SDK (backed by JetBrains) requires server setup, transport c
 
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, filesystem controls, and exec prevention.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a suspend `handleRequest` method that takes a `JsonObject` and returns `JsonObject?`.
+
+```kotlin
+// val response: JsonObject? = server.handleRequest(request)
+```
+
+**Ktor**
+
+```kotlin
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+
+embeddedServer(Netty, port = 4242) {
+    routing {
+        post("/mcp") {
+            val body = call.receiveText()
+            val request = Json.parseToJsonElement(body).jsonObject
+            val response = server.handleRequest(request)
+            if (response == null) {
+                call.respond(HttpStatusCode.NoContent)
+            } else {
+                call.respondText(response.toString(), ContentType.Application.Json)
+            }
+        }
+    }
+}.start(wait = true)
+```
+
 ## Requirements
 
 - Kotlin 2.0+

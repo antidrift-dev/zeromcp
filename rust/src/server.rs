@@ -101,7 +101,16 @@ impl Server {
         }
     }
 
-    async fn handle_request(&self, request: &Value) -> Option<Value> {
+    /// Process a single JSON-RPC request and return a response.
+    /// Returns `None` for notifications that require no response.
+    ///
+    /// # Example
+    /// ```no_run
+    /// let response = server.handle_request(&serde_json::json!({
+    ///     "jsonrpc": "2.0", "id": 1, "method": "tools/list"
+    /// })).await;
+    /// ```
+    pub async fn handle_request(&self, request: &Value) -> Option<Value> {
         let id = request.get("id");
         let method = request.get("method")?.as_str()?;
         let params = request.get("params");

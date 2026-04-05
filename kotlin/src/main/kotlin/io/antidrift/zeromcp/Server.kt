@@ -63,18 +63,27 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
 
             val response = runBlocking { handleRequest(request) }
             if (response != null) {
-                println(response)
+                println(json.encodeToString(JsonObject.serializer(), response))
                 System.out.flush()
             }
         }
     }
 
-    private suspend fun handleRequest(request: JsonObject): String? {
+    /**
+     * Process a single JSON-RPC request and return a response.
+     * Returns null for notifications that require no response.
+     *
+     * Usage:
+     * ```kotlin
+     * val request = json.parseToJsonElement("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""").jsonObject
+     * val response = server.handleRequest(request)
+     * ```
+     */
+    suspend fun handleRequest(request: JsonObject): JsonObject? {
         val id = request["id"]
         val method = request["method"]?.jsonPrimitive?.content ?: ""
         val params = request["params"]?.jsonObject
 
-        // Notification — no response needed
         if (id == null && method == "notifications/initialized") return null
 
         val response = when (method) {
@@ -105,7 +114,6 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
 
             "tools/call" -> {
                 val toolName = params?.get("name")?.jsonPrimitive?.content ?: ""
-                // Guard against null arguments (JSON null or missing)
                 val argsElement = params?.get("arguments")
                 val argsMap = if (argsElement is JsonObject) argsElement.toArgMap() else emptyMap()
                 buildResponse(id, callTool(toolName, argsMap))
@@ -119,7 +127,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
             }
         }
 
-        return json.encodeToString(JsonObject.serializer(), response)
+        return response
     }
 
     private suspend fun callTool(name: String, args: Map<String, Any?>): JsonObject {

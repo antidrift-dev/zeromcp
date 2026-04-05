@@ -255,6 +255,46 @@ func httpJSON(w http.ResponseWriter, data any, status int) {
 	json.NewEncoder(w).Encode(data)
 }
 
+// HandleRequest processes a single JSON-RPC request and returns a response.
+// Returns nil for notifications that require no response.
+//
+// Usage:
+//
+//	resp := server.HandleRequest(map[string]any{
+//	    "jsonrpc": "2.0", "id": 1, "method": "tools/list",
+//	})
+func (s *Server) HandleRequest(request map[string]any) map[string]any {
+	raw, err := json.Marshal(request)
+	if err != nil {
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"error":   map[string]any{"code": -32700, "message": "Parse error"},
+		}
+	}
+
+	var req jsonRPCRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		return map[string]any{
+			"jsonrpc": "2.0",
+			"error":   map[string]any{"code": -32700, "message": "Parse error"},
+		}
+	}
+
+	resp := s.handleRequest(req)
+	if resp == nil {
+		return nil
+	}
+
+	// Convert to map[string]any for a clean public API
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return nil
+	}
+	var result map[string]any
+	json.Unmarshal(b, &result)
+	return result
+}
+
 func (s *Server) handleRequest(req jsonRPCRequest) *jsonRPCResponse {
 	// Notifications (no id) for initialized
 	if req.ID == nil && req.Method == "notifications/initialized" {

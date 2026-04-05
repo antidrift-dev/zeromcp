@@ -15,6 +15,16 @@ class Server
         $this->scanner = new Scanner($this->config);
     }
 
+    /**
+     * Load tools from the configured directories. Call this before using
+     * handleRequest() directly (serve() calls this automatically).
+     */
+    public function loadTools(): void
+    {
+        $this->tools = $this->scanner->scan();
+        fwrite(STDERR, "[zeromcp] " . count($this->tools) . " tool(s) loaded\n");
+    }
+
     public function serve(): void
     {
         $this->tools = $this->scanner->scan();
@@ -40,7 +50,19 @@ class Server
         fclose($stdin);
     }
 
-    private function handleRequest(array $request): ?array
+    /**
+     * Process a single JSON-RPC request and return a response.
+     * Returns null for notifications that require no response.
+     *
+     * Usage:
+     *   $response = $server->handleRequest([
+     *       'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list',
+     *   ]);
+     *
+     * Note: tools must be loaded first via serve() or by calling the scanner
+     * manually if using this method directly for HTTP integration.
+     */
+    public function handleRequest(array $request): ?array
     {
         $id = $request['id'] ?? null;
         $method = $request['method'] ?? '';

@@ -26,6 +26,33 @@ The official Ruby SDK requires server setup, transport configuration, and explic
 
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handle_request` method that takes a Hash and returns a Hash (or `nil` for notifications).
+
+```ruby
+# response = server.handle_request(request)
+```
+
+**Sinatra**
+
+```ruby
+require 'sinatra'
+require 'json'
+
+post '/mcp' do
+  request_body = JSON.parse(request.body.read)
+  response = server.handle_request(request_body)
+
+  if response.nil?
+    status 204
+  else
+    content_type :json
+    response.to_json
+  end
+end
+```
+
 ## Requirements
 
 - Ruby 3.0+

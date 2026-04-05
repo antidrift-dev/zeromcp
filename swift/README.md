@@ -28,6 +28,35 @@ The official Swift SDK requires server setup, transport configuration, and schem
 
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you an async `handleRequest` method that takes a `[String: Any]` dict and returns `[String: Any]?`.
+
+```swift
+// let response = await server.handleRequest(request)
+```
+
+**Vapor**
+
+```swift
+import Vapor
+
+let app = try Application(.detect())
+
+app.post("mcp") { req async throws -> Response in
+    let request = try req.content.decode([String: AnyCodable].self)
+    let dict = request.mapValues { $0.value }
+
+    if let response = await server.handleRequest(dict) {
+        let body = try JSONSerialization.data(withJSONObject: response)
+        return Response(status: .ok, headers: ["Content-Type": "application/json"], body: .init(data: body))
+    }
+    return Response(status: .noContent)
+}
+
+try app.run()
+```
+
 ## Requirements
 
 - Swift 5.9+

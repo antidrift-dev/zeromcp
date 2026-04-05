@@ -34,6 +34,36 @@ The official C# SDK (backed by Microsoft) requires server setup, transport confi
 
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you an async `HandleRequest` method that takes a `JsonDocument` and returns a response dictionary (or `null` for notifications).
+
+```csharp
+// var response = await server.HandleRequest(request);
+```
+
+**ASP.NET Minimal API**
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+app.MapPost("/mcp", async (HttpContext ctx) =>
+{
+    var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+    var response = await server.HandleRequest(doc);
+    if (response == null)
+    {
+        ctx.Response.StatusCode = 204;
+        return;
+    }
+    ctx.Response.ContentType = "application/json";
+    await ctx.Response.WriteAsJsonAsync(response);
+});
+
+app.Run("http://0.0.0.0:4242");
+```
+
 ## Requirements
 
 - .NET 8

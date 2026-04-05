@@ -16,6 +16,13 @@ module ZeroMcp
       @tools = {}
     end
 
+    # Load tools from the configured directories. Call this before using
+    # handle_request directly (serve calls this automatically).
+    def load_tools
+      @tools = @scanner.scan
+      $stderr.puts "[zeromcp] #{@tools.size} tool(s) loaded"
+    end
+
     def serve
       $stdout.sync = true
       $stderr.sync = true
@@ -49,8 +56,14 @@ module ZeroMcp
       end
     end
 
-    private
-
+    # Process a single JSON-RPC request hash and return a response hash.
+    # Returns nil for notifications that require no response.
+    #
+    # Note: tools must be loaded first via #serve or by calling scanner.scan
+    # manually if using this method directly for HTTP integration.
+    #
+    # Usage:
+    #   response = server.handle_request({"jsonrpc" => "2.0", "id" => 1, "method" => "tools/list"})
     def handle_request(request)
       id = request['id']
       method = request['method']
@@ -106,6 +119,8 @@ module ZeroMcp
         }
       end
     end
+
+    private
 
     def build_tool_list
       @tools.map do |name, tool|

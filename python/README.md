@@ -29,6 +29,48 @@ The official SDK also pulls in pydantic, httpx, uvicorn, starlette, and more. **
 
 The official SDK has **no sandbox**. ZeroMCP enforces per-tool network allowlists, credential isolation, and filesystem controls at runtime.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you an async handler that takes a JSON-RPC dict and returns a response dict (or `None` for notifications).
+
+```python
+from zeromcp import create_handler
+
+handler = await create_handler("./tools")
+# handler(request: dict) -> dict | None
+```
+
+**Flask**
+
+```python
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route("/mcp", methods=["POST"])
+async def mcp():
+    response = await handler(request.get_json())
+    if response is None:
+        return "", 204
+    return jsonify(response)
+```
+
+**FastAPI**
+
+```python
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+
+@app.post("/mcp")
+async def mcp(req: Request):
+    response = await handler(await req.json())
+    if response is None:
+        return JSONResponse(status_code=204, content=None)
+    return response
+```
+
 ## Requirements
 
 - Python 3.10+

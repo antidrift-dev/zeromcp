@@ -11,6 +11,47 @@ from .scanner import ToolScanner
 from .schema import to_json_schema, validate
 
 
+async def create_handler(config_or_path: dict | str | None = None):
+    """Create a handler function that processes JSON-RPC requests.
+
+    Returns an async function: (request: dict) -> dict | None
+
+    Usage::
+
+        handler = await create_handler("./tools")
+        response = await handler(json_rpc_request)
+
+    Works with any HTTP framework::
+
+        @app.post("/mcp")
+        async def mcp(request):
+            return await handler(await request.json())
+    """
+    if isinstance(config_or_path, str):
+        config = load_config(config_or_path)
+    else:
+        config = config_or_path or {}
+
+    all_tools: dict = {}
+
+    scanner = ToolScanner(config)
+    try:
+        scanner.scan()
+        all_tools.update(scanner.tools)
+    except Exception:
+        _log("No tools directory found")
+
+    tool_count = len(all_tools)
+    _log(f"{tool_count} tool(s) loaded")
+
+    execute_timeout = config.get("execute_timeout", 30)
+
+    async def handler(request: dict) -> dict | None:
+        return await _handle_request(request, all_tools, execute_timeout)
+
+    return handler
+
+
 async def serve(config_or_path: dict | str | None = None) -> None:
     """Start the MCP server with the given config."""
     if isinstance(config_or_path, str):

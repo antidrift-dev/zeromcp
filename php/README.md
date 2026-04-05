@@ -28,6 +28,37 @@ The official PHP SDK (backed by The PHP Foundation) requires Composer, server se
 
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handleRequest` method that takes an associative array and returns an array (or `null` for notifications).
+
+```php
+// $response = $server->handleRequest($request);
+```
+
+**Slim**
+
+```php
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\Factory\AppFactory;
+
+$app = AppFactory::create();
+
+$app->post('/mcp', function (Request $req, Response $res) use ($server) {
+    $body = json_decode((string) $req->getBody(), true);
+    $response = $server->handleRequest($body);
+
+    if ($response === null) {
+        return $res->withStatus(204);
+    }
+    $res->getBody()->write(json_encode($response));
+    return $res->withHeader('Content-Type', 'application/json');
+});
+
+$app->run();
+```
+
 ## Requirements
 
 - PHP CLI (no extensions required)

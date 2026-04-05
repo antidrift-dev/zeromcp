@@ -66,7 +66,16 @@ public class ZeroMcp {
         }
     }
 
-    private func handleRequest(_ request: [String: Any]) async -> [String: Any]? {
+    /// Process a single JSON-RPC request and return a response.
+    /// Returns `nil` for notifications that require no response.
+    ///
+    /// Usage:
+    /// ```swift
+    /// let response = await server.handleRequest([
+    ///     "jsonrpc": "2.0", "id": 1, "method": "tools/list"
+    /// ])
+    /// ```
+    public func handleRequest(_ request: [String: Any]) async -> [String: Any]? {
         let id = request["id"]
         let method = request["method"] as? String ?? ""
         let params = request["params"] as? [String: Any] ?? [:]

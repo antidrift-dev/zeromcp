@@ -40,6 +40,38 @@ The official Go SDK (backed by Google) requires server setup, transport configur
 
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, credential isolation, and a sandboxed `Ctx.Fetch()`.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `HandleRequest` method that takes a JSON-RPC map and returns a response map (or `nil` for notifications).
+
+```go
+// server.HandleRequest(request map[string]any) map[string]any
+```
+
+**net/http**
+
+```go
+import (
+    "encoding/json"
+    "net/http"
+)
+
+http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+    var request map[string]any
+    json.NewDecoder(r.Body).Decode(&request)
+
+    response := s.HandleRequest(request)
+    if response == nil {
+        w.WriteHeader(http.StatusNoContent)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(response)
+})
+
+http.ListenAndServe(":4242", nil)
+```
+
 ## Requirements
 
 - Go 1.22+

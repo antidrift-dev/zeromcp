@@ -70,7 +70,18 @@ public class ZeroMcp {
         });
     }
 
-    private JsonObject handleRequest(JsonObject request) {
+    /**
+     * Process a single JSON-RPC request and return a response.
+     * Returns null for notifications that require no response.
+     *
+     * <pre>
+     * JsonObject request = JsonParser.parseString(
+     *     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"
+     * ).getAsJsonObject();
+     * JsonObject response = server.handleRequest(request);
+     * </pre>
+     */
+    public JsonObject handleRequest(JsonObject request) {
         var id = request.get("id");
         var method = request.has("method") ? request.get("method").getAsString() : "";
         var params = request.has("params") ? request.getAsJsonObject("params") : null;

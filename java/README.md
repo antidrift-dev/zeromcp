@@ -30,6 +30,33 @@ The official Java SDK (backed by Spring AI) requires server setup, transport con
 
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, filesystem controls, and exec prevention.
 
+## HTTP / Streamable HTTP
+
+ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handleRequest` method that takes a `JsonObject` and returns a `JsonObject` (or `null` for notifications).
+
+```java
+// JsonObject response = server.handleRequest(request);
+```
+
+**Javalin**
+
+```java
+import io.javalin.Javalin;
+import com.google.gson.JsonParser;
+
+var app = Javalin.create().start(4242);
+
+app.post("/mcp", ctx -> {
+    var request = JsonParser.parseString(ctx.body()).getAsJsonObject();
+    var response = server.handleRequest(request);
+    if (response == null) {
+        ctx.status(204);
+    } else {
+        ctx.contentType("application/json").result(response.toString());
+    }
+});
+```
+
 ## Requirements
 
 - Java 17+

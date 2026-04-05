@@ -87,7 +87,15 @@ public class ZeroMcpServer
         }
     }
 
-    private async Task<Dictionary<string, object?>?> HandleRequest(JsonDocument request)
+    /// <summary>
+    /// Process a single JSON-RPC request and return a response.
+    /// Returns null for notifications that require no response.
+    /// </summary>
+    /// <example>
+    /// var request = JsonDocument.Parse("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
+    /// var response = await server.HandleRequest(request);
+    /// </example>
+    public async Task<Dictionary<string, object?>?> HandleRequest(JsonDocument request)
     {
         var root = request.RootElement;
         var hasId = root.TryGetProperty("id", out var idElement);
