@@ -123,16 +123,16 @@ s.ServeStdio()
 
 | Language | Directory | Runtime | Tool model |
 |----------|-----------|---------|------------|
-| [Node.js](nodejs/) | `nodejs/` | Node 14+ (also Bun, Deno) | File-based (drop `.js` files) |
-| [Python](python/) | `python/` | Python 3.10+ | File-based (drop `.py` files) |
-| [Go](go/) | `go/` | Go 1.22+ | Code registration |
-| [Rust](rust/) | `rust/` | Rust 2021 | Code registration |
-| [Java](java/) | `java/` | Java 17+ | Code registration (builder) |
-| [Kotlin](kotlin/) | `kotlin/` | Kotlin 2.0 / JVM 21 | Code registration (DSL) |
-| [Swift](swift/) | `swift/` | Swift 5.9+ / macOS 13+ | Code registration |
-| [C#](csharp/) | `csharp/` | .NET 8 | Code registration |
-| [Ruby](ruby/) | `ruby/` | Ruby 3.0+ | File-based (drop `.rb` files) |
-| [PHP](php/) | `php/` | PHP CLI | File-based (drop `.php` files) |
+| [Node.js](nodejs/) | `nodejs/` | Node 14+ (also Bun, Deno) | Drop a `.js` file, it's a tool |
+| [Python](python/) | `python/` | Python 3.9+ | Drop a `.py` file, it's a tool |
+| [Ruby](ruby/) | `ruby/` | Ruby 3.0+ | Drop a `.rb` file, it's a tool |
+| [PHP](php/) | `php/` | PHP 8.1+ | Drop a `.php` file, it's a tool |
+| [Go](go/) | `go/` | Go 1.22+ | Register tools in code |
+| [Rust](rust/) | `rust/` | Rust 1.78+ | Register tools in code |
+| [Java](java/) | `java/` | Java 17+ | Register tools in code (builder API) |
+| [Kotlin](kotlin/) | `kotlin/` | Kotlin 2.0 / JVM 21 | Register tools in code (DSL) |
+| [Swift](swift/) | `swift/` | Swift 5.9+ / macOS 13+ | Register tools in code |
+| [C#](csharp/) | `csharp/` | .NET 8 | Register tools in code |
 
 ## Sandbox
 
