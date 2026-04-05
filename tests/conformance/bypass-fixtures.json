@@ -1,0 +1,12 @@
+{
+  "tests": [
+    { "name": "bypass_init", "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "bypass-test", "version": "1.0" } } }, "expect": { "jsonrpc": "2.0", "id": 1, "result": { "protocolVersion": "2024-11-05" } }, "match": "partial" },
+    { "name": "bypass_initialized", "request": { "jsonrpc": "2.0", "method": "notifications/initialized" }, "match": "silent" },
+    {
+      "name": "bypass_allows_blocked_domain",
+      "request": { "jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": { "name": "fetch_evil", "arguments": {} } },
+      "expect_content_json": { "bypassed": true },
+      "match": "content_json"
+    }
+  ]
+}

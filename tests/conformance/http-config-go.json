@@ -1,0 +1,6 @@
+{
+  "tools": ["./go/examples/basic"],
+  "transport": [
+    { "type": "http", "port": 14243, "auth": "env:TEST_MCP_TOKEN" }
+  ]
+}

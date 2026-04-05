@@ -92,4 +92,7 @@ RUN cd csharp && dotnet publish Example -c Release -o /tmp/csharp-out 2>&1 | tai
 RUN cd csharp && dotnet publish SandboxTest -c Release -o /tmp/csharp-sandbox-out 2>&1 | tail -3
 RUN cd csharp && dotnet publish ChaosTest -c Release -o /tmp/csharp-chaos-out 2>&1 | tail -3
 
+# Test fixtures
+RUN echo '{"api_key":"file-secret-123"}' > /tmp/test-creds.json
+
 CMD ["node", "tests/conformance/run-all.js"]

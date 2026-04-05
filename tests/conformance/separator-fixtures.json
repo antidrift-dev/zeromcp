@@ -1,0 +1,18 @@
+{
+  "tests": [
+    { "name": "sep_init", "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "separator-test", "version": "1.0" } } }, "expect": { "jsonrpc": "2.0", "id": 1, "result": { "protocolVersion": "2024-11-05" } }, "match": "partial" },
+    { "name": "sep_initialized", "request": { "jsonrpc": "2.0", "method": "notifications/initialized" }, "match": "silent" },
+    {
+      "name": "sep_dot_separator",
+      "request": { "jsonrpc": "2.0", "id": 10, "method": "tools/list", "params": {} },
+      "expect_tool_names": ["billing.invoice", "billing.refund", "hello"],
+      "match": "tool_names"
+    },
+    {
+      "name": "sep_call_dot_tool",
+      "request": { "jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": { "name": "billing.invoice", "arguments": {} } },
+      "expect_content_json": { "tool": "billing_invoice" },
+      "match": "content_json"
+    }
+  ]
+}

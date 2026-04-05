@@ -1,0 +1,24 @@
+{
+  "tests": [
+    { "name": "multi_init", "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "multi-dir-test", "version": "1.0" } } }, "expect": { "jsonrpc": "2.0", "id": 1, "result": { "protocolVersion": "2024-11-05" } }, "match": "partial" },
+    { "name": "multi_initialized", "request": { "jsonrpc": "2.0", "method": "notifications/initialized" }, "match": "silent" },
+    {
+      "name": "multi_both_dirs_loaded",
+      "request": { "jsonrpc": "2.0", "id": 10, "method": "tools/list", "params": {} },
+      "expect_tool_names": ["alpha", "beta"],
+      "match": "tool_names"
+    },
+    {
+      "name": "multi_call_alpha",
+      "request": { "jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": { "name": "alpha", "arguments": {} } },
+      "expect_content_json": { "source": "dir-a", "tool": "alpha" },
+      "match": "content_json"
+    },
+    {
+      "name": "multi_call_beta",
+      "request": { "jsonrpc": "2.0", "id": 12, "method": "tools/call", "params": { "name": "beta", "arguments": {} } },
+      "expect_content_json": { "source": "dir-b", "tool": "beta" },
+      "match": "content_json"
+    }
+  ]
+}

@@ -219,6 +219,94 @@ const suites = [
     fixtures: 'namespace-fixtures.json',
     implementations: namespaceImplementations,
   },
+  {
+    name: 'Execute Timeout',
+    fixtures: 'timeout-fixtures.json',
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', join(__dirname, 'timeout-tools')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', join(__dirname, 'timeout-tools')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+    ],
+  },
+  {
+    name: 'Bypass Permissions',
+    fixtures: 'bypass-fixtures.json',
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'bypass-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'bypass-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+    ],
+    setup: startMockServer,
+    teardown: stopMockServer,
+  },
+  {
+    name: 'Credential File',
+    fixtures: 'credential-file-fixtures.json',
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'credential-file-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'credential-file-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+    ],
+  },
+  {
+    name: 'Custom Separator',
+    fixtures: 'separator-fixtures.json',
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'separator-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'separator-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+      // Ruby and PHP don't support --config flag yet
+    ],
+  },
+  {
+    name: 'Multiple Tool Directories',
+    fixtures: 'multi-dir-fixtures.json',
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'multi-dir-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'multi-dir-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------

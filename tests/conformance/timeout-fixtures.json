@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {
+      "name": "timeout_init",
+      "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "timeout-test", "version": "1.0" } } },
+      "expect": { "jsonrpc": "2.0", "id": 1, "result": { "protocolVersion": "2024-11-05" } },
+      "match": "partial"
+    },
+    { "name": "timeout_initialized", "request": { "jsonrpc": "2.0", "method": "notifications/initialized" }, "match": "silent" },
+    {
+      "name": "timeout_fast_tool_succeeds",
+      "request": { "jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": { "name": "hello", "arguments": { "name": "World" } } },
+      "expect_content_contains": "Hello, World!",
+      "match": "content_contains"
+    },
+    {
+      "name": "timeout_slow_tool_times_out",
+      "request": { "jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": { "name": "slow", "arguments": {} } },
+      "expect_content_contains": "timed out",
+      "match": "content_contains"
+    }
+  ]
+}

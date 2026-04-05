@@ -1,0 +1,3 @@
+{
+  "tools": ["./tests/conformance/multi-tools-a", "./tests/conformance/multi-tools-b"]
+}

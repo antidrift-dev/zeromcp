@@ -1,0 +1,4 @@
+{
+  "tools": ["./tests/conformance/bypass-tools"],
+  "bypass_permissions": true
+}
