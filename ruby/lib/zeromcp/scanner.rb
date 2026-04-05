@@ -13,14 +13,17 @@ module ZeroMcp
 
     def scan
       @tools.clear
-      dir = File.expand_path(@config.tools_dir)
+      dirs = @config.tools_dir
+      dirs = [dirs] unless dirs.is_a?(Array)
 
-      unless Dir.exist?(dir)
-        $stderr.puts "[zeromcp] Cannot read tools directory: #{dir}"
-        return @tools
+      dirs.each do |d|
+        dir = File.expand_path(d)
+        unless Dir.exist?(dir)
+          $stderr.puts "[zeromcp] Cannot read tools directory: #{dir}"
+          next
+        end
+        scan_dir(dir, dir)
       end
-
-      scan_dir(dir, dir)
       @tools
     end
 

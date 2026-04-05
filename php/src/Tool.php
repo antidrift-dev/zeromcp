@@ -36,11 +36,13 @@ class Context
     public string $toolName;
     public mixed $credentials;
     public array $permissions;
+    public bool $bypass;
 
-    public function __construct(string $toolName, mixed $credentials = null, array $permissions = [])
+    public function __construct(string $toolName, mixed $credentials = null, array $permissions = [], bool $bypass = false)
     {
         $this->toolName = $toolName;
         $this->credentials = $credentials;
         $this->permissions = $permissions;
+        $this->bypass = $bypass;
     }
 }

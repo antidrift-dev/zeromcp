@@ -4,19 +4,22 @@ namespace ZeroMcp;
 
 class Config
 {
-    public string $toolsDir;
+    public array $toolsDirs;
     public string $separator;
     public bool $logging;
     public bool $bypassPermissions;
-    public int $executeTimeout; // seconds
+    public int $executeTimeout;
+    public array $credentials;
 
     public function __construct(array $opts = [])
     {
-        $this->toolsDir = $opts['tools'] ?? './tools';
+        $tools = $opts['tools'] ?? './tools';
+        $this->toolsDirs = is_array($tools) ? $tools : [$tools];
         $this->separator = $opts['separator'] ?? '_';
         $this->logging = $opts['logging'] ?? false;
         $this->bypassPermissions = $opts['bypass_permissions'] ?? false;
         $this->executeTimeout = $opts['execute_timeout'] ?? 30;
+        $this->credentials = $opts['credentials'] ?? [];
     }
 
     public static function load(?string $path = null): self

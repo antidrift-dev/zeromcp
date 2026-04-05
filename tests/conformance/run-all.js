@@ -378,7 +378,18 @@ const suites = [
         env: { ZEROMCP_BYPASS: 'true' },
         optional: true,
       },
-      // Ruby and PHP don't support --config flag yet
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'bypass-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'bypass-config.json')],
+        optional: true,
+      },
     ],
     setup: startMockServer,
     teardown: stopMockServer,
@@ -398,6 +409,18 @@ const suites = [
         args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'credential-file-config.json')],
         env: { PYTHONPATH: join(root, 'python') },
       },
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'credential-file-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'credential-file-config.json')],
+        optional: true,
+      },
     ],
   },
   {
@@ -415,7 +438,18 @@ const suites = [
         args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'separator-config.json')],
         env: { PYTHONPATH: join(root, 'python') },
       },
-      // Ruby and PHP don't support --config flag yet
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'separator-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'separator-config.json')],
+        optional: true,
+      },
     ],
   },
   {
@@ -432,6 +466,18 @@ const suites = [
         command: 'python3',
         args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'multi-dir-config.json')],
         env: { PYTHONPATH: join(root, 'python') },
+      },
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'multi-dir-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'multi-dir-config.json')],
+        optional: true,
       },
     ],
   },

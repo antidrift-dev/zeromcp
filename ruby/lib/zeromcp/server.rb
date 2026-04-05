@@ -155,7 +155,7 @@ module ZeroMcp
       end
 
       begin
-        ctx = Context.new(tool_name: name, permissions: tool.permissions)
+        ctx = Context.new(tool_name: name, permissions: tool.permissions, bypass: @config.bypass_permissions, credentials: _resolve_credentials(name))
 
         # Tool-level timeout overrides config default
         timeout_secs = (tool.permissions.is_a?(Hash) && tool.permissions[:execute_timeout]) ||
@@ -170,6 +170,33 @@ module ZeroMcp
       rescue => e
         { 'content' => [{ 'type' => 'text', 'text' => "Error: #{e.message}" }], 'isError' => true }
       end
+    end
+
+    def _resolve_credentials(tool_name)
+      return nil if @config.credentials.empty?
+      # Match credential namespace from tool name prefix
+      @config.credentials.each do |ns, source|
+        if tool_name.start_with?("#{ns}_") || tool_name.start_with?("#{ns}#{@config.separator}")
+          return _resolve_credential_source(source)
+        end
+      end
+      nil
+    end
+
+    def _resolve_credential_source(source)
+      source = source.transform_keys(&:to_s) if source.is_a?(Hash)
+      if source['env']
+        val = ENV[source['env']]
+        return nil if val.nil? || val.empty?
+        begin; return JSON.parse(val); rescue; return val; end
+      end
+      if source['file']
+        path = File.expand_path(source['file'])
+        return nil unless File.exist?(path)
+        val = File.read(path).strip
+        begin; return JSON.parse(val); rescue; return val; end
+      end
+      nil
     end
   end
 end

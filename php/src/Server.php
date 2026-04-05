@@ -155,7 +155,9 @@ class Server
         }
 
         try {
-            $ctx = new Context($name, null, $tool->permissions);
+            $creds = $this->resolveCredentials($name);
+            $ctx = new Context($name, $creds, $tool->permissions);
+            $ctx->bypass = $this->config->bypassPermissions;
 
             // Tool-level timeout overrides config default
             $timeoutSecs = $tool->permissions['execute_timeout'] ?? $this->config->executeTimeout;
@@ -199,5 +201,36 @@ class Server
                 'isError' => true,
             ];
         }
+    }
+
+    private function resolveCredentials(string $toolName): mixed
+    {
+        if (empty($this->config->credentials)) return null;
+        foreach ($this->config->credentials as $ns => $source) {
+            $sep = $this->config->separator;
+            if (str_starts_with($toolName, "{$ns}_") || str_starts_with($toolName, "{$ns}{$sep}")) {
+                return $this->resolveCredentialSource($source);
+            }
+        }
+        return null;
+    }
+
+    private function resolveCredentialSource(array $source): mixed
+    {
+        if (!empty($source['env'])) {
+            $val = getenv($source['env']);
+            if ($val === false || $val === '') return null;
+            $decoded = json_decode($val, true);
+            return $decoded !== null ? $decoded : $val;
+        }
+        if (!empty($source['file'])) {
+            $path = $source['file'];
+            if (str_starts_with($path, '~')) $path = getenv('HOME') . substr($path, 1);
+            if (!file_exists($path)) return null;
+            $val = trim(file_get_contents($path));
+            $decoded = json_decode($val, true);
+            return $decoded !== null ? $decoded : $val;
+        }
+        return null;
     }
 }

@@ -17,14 +17,17 @@ class Scanner
     public function scan(): array
     {
         $this->tools = [];
-        $dir = realpath($this->config->toolsDir) ?: $this->config->toolsDir;
+        $dirs = $this->config->toolsDirs;
 
-        if (!is_dir($dir)) {
-            fwrite(STDERR, "[zeromcp] Cannot read tools directory: $dir\n");
-            return $this->tools;
+        foreach ($dirs as $d) {
+            $dir = realpath($d) ?: $d;
+            if (!is_dir($dir)) {
+                fwrite(STDERR, "[zeromcp] Cannot read tools directory: $dir\n");
+                continue;
+            }
+            $this->scanDir($dir, $dir);
         }
 
-        $this->scanDir($dir, $dir);
         return $this->tools;
     }
 
