@@ -21,6 +21,309 @@
 
   ],
   "swiftCommands" : {
+    "C.BypassTest-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/sources",
+      "importPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/BypassTest/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "BypassTest",
+      "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/BypassTest.swiftmodule",
+      "objects" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "BypassTest_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift"
+      ],
+      "outputFileMapPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/BypassTest.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/BypassTest/main.swift"
+      ],
+      "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.ChaosTest-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/sources",
+      "importPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ChaosTest/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "ChaosTest",
+      "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ChaosTest.swiftmodule",
+      "objects" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "ChaosTest_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift"
+      ],
+      "outputFileMapPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ChaosTest.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ChaosTest/main.swift"
+      ],
+      "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.CredentialTest-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/sources",
+      "importPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/CredentialTest/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "CredentialTest",
+      "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/CredentialTest.swiftmodule",
+      "objects" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "CredentialTest_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift"
+      ],
+      "outputFileMapPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/CredentialTest.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/CredentialTest/main.swift"
+      ],
+      "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build",
+      "wholeModuleOptimization" : false
+    },
     "C.Example-arm64-apple-macosx15.0-debug.module" : {
       "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources",
@@ -122,6 +425,208 @@
       "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build",
       "wholeModuleOptimization" : false
     },
+    "C.SandboxTest-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/sources",
+      "importPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/SandboxTest/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "SandboxTest",
+      "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/SandboxTest.swiftmodule",
+      "objects" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "SandboxTest_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift"
+      ],
+      "outputFileMapPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/SandboxTest.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/SandboxTest/main.swift"
+      ],
+      "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.TimeoutTest-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/sources",
+      "importPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/TimeoutTest/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "TimeoutTest",
+      "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/TimeoutTest.swiftmodule",
+      "objects" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "TimeoutTest_main",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "swift"
+      ],
+      "outputFileMapPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/TimeoutTest.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/TimeoutTest/main.swift"
+      ],
+      "tempsPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build",
+      "wholeModuleOptimization" : false
+    },
     "C.ZeroMcp-arm64-apple-macosx15.0-debug.module" : {
       "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "fileList" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources",
@@ -130,6 +635,10 @@
         {
           "kind" : "file",
           "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Sandbox.swift"
         },
         {
           "kind" : "file",
@@ -157,6 +666,7 @@
       "moduleOutputPath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules/ZeroMcp.swiftmodule",
       "objects" : [
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
@@ -224,6 +734,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
         },
         {
@@ -242,6 +756,7 @@
       "prepareForIndexing" : false,
       "sources" : [
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift",
+        "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Sandbox.swift",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Schema.swift",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Server.swift",
         "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Tool.swift"
@@ -455,6 +970,204 @@
 
   },
   "swiftTargetScanArgs" : {
+    "BypassTest" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "BypassTest",
+      "-package-name",
+      "swift",
+      "-c",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/BypassTest/main.swift",
+      "-I",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "BypassTest_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ChaosTest" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ChaosTest",
+      "-package-name",
+      "swift",
+      "-c",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ChaosTest/main.swift",
+      "-I",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "ChaosTest_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "CredentialTest" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "CredentialTest",
+      "-package-name",
+      "swift",
+      "-c",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/CredentialTest/main.swift",
+      "-I",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "CredentialTest_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
     "Example" : [
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "-module-name",
@@ -521,6 +1234,138 @@
       "-driver-use-frontend-path",
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
     ],
+    "SandboxTest" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "SandboxTest",
+      "-package-name",
+      "swift",
+      "-c",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/SandboxTest/main.swift",
+      "-I",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "SandboxTest_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "TimeoutTest" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "TimeoutTest",
+      "-package-name",
+      "swift",
+      "-c",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/TimeoutTest/main.swift",
+      "-I",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "TimeoutTest_main",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "swift",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
     "ZeroMcp" : [
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "-module-name",
@@ -529,6 +1374,7 @@
       "swift",
       "-c",
       "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift",
+      "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Sandbox.swift",
       "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Schema.swift",
       "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Server.swift",
       "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Tool.swift",
@@ -723,7 +1569,22 @@
     ]
   },
   "targetDependencyMap" : {
+    "BypassTest" : [
+      "ZeroMcp"
+    ],
+    "ChaosTest" : [
+      "ZeroMcp"
+    ],
+    "CredentialTest" : [
+      "ZeroMcp"
+    ],
     "Example" : [
+      "ZeroMcp"
+    ],
+    "SandboxTest" : [
+      "ZeroMcp"
+    ],
+    "TimeoutTest" : [
       "ZeroMcp"
     ],
     "ZeroMcp" : [
@@ -759,6 +1620,48 @@
     }
   },
   "writeCommands" : {
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/BypassTest/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/sources"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ChaosTest/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/sources"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/CredentialTest/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/sources"
+    },
     "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources" : {
       "alwaysOutOfDate" : false,
       "inputs" : [
@@ -773,6 +1676,34 @@
       ],
       "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/Example.build/sources"
     },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/SandboxTest/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/sources"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/TimeoutTest/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/sources"
+    },
     "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/sources" : {
       "alwaysOutOfDate" : false,
       "inputs" : [
@@ -783,6 +1714,10 @@
         {
           "kind" : "file",
           "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Config.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Sandbox.swift"
         },
         {
           "kind" : "file",
@@ -823,6 +1758,10 @@
         {
           "kind" : "file",
           "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
         },
         {
           "kind" : "file",
@@ -875,6 +1814,150 @@
       ],
       "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
     },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-bypass-test-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-bypass-test-entitlement.plist"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-bypass-test.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/BypassTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-bypass-test.product/Objects.LinkFileList"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-chaos-test-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-chaos-test-entitlement.plist"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-chaos-test.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ChaosTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-chaos-test.product/Objects.LinkFileList"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-credential-test-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-credential-test-entitlement.plist"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-credential-test.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/CredentialTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-credential-test.product/Objects.LinkFileList"
+    },
     "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example-entitlement.plist" : {
       "alwaysOutOfDate" : false,
       "inputs" : [
@@ -906,6 +1989,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
         },
         {
@@ -918,6 +2005,102 @@
         }
       ],
       "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-example.product/Objects.LinkFileList"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-sandbox-test-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-sandbox-test-entitlement.plist"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-sandbox-test.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/SandboxTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-sandbox-test.product/Objects.LinkFileList"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-timeout-test-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-timeout-test-entitlement.plist"
+    },
+    "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-timeout-test.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Server.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Tool.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/zeromcp-timeout-test.product/Objects.LinkFileList"
     }
   }
 }

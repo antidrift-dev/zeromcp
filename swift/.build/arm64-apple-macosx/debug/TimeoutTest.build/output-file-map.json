@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/master.swiftdeps"
+  },
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/TimeoutTest/main.swift": {
+    "dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.d",
+    "object": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.swift.o",
+    "swiftmodule": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.swiftdeps",
+    "diagnostics": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/TimeoutTest.build/main.dia"
+  }
+}

@@ -1,6 +1,8 @@
 package io.antidrift.zeromcp
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
 
@@ -146,7 +148,9 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
         return try {
             val ctx = Ctx(toolName = name, permissions = tool.permissions)
             val result = withTimeout(timeoutMs) {
-                tool.execute(args, ctx)
+                runInterruptible(Dispatchers.IO) {
+                    runBlocking { tool.execute(args, ctx) }
+                }
             }
             val text = when (result) {
                 is String -> result

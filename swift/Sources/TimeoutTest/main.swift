@@ -6,7 +6,7 @@ let server = ZeroMcp()
 server.tool(
     "hello",
     description: "Fast tool",
-    input: ["name": "string"]
+    input: ["name": .simple(.string)]
 ) { args, ctx in
     let name = args["name"] as? String ?? "world"
     return "Hello, \(name)!"

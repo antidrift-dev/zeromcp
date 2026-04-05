@@ -2,14 +2,28 @@
 # frozen_string_literal: true
 
 require_relative '../lib/zeromcp'
+require 'json'
 
-command = ARGV[0]
-tools_dir = ARGV[1]
+# Parse --config flag from anywhere in ARGV
+config_path = nil
+args = ARGV.dup
+if (idx = args.index('--config'))
+  config_path = args[idx + 1]
+  args.slice!(idx, 2)
+end
+
+command = args[0]
+tools_dir = args[1]
 
 case command
 when 'serve'
-  config = ZeroMcp::Config.load
-  config = ZeroMcp::Config.new('tools' => tools_dir) if tools_dir
+  if config_path
+    data = JSON.parse(File.read(config_path))
+    config = ZeroMcp::Config.new(data)
+  else
+    config = ZeroMcp::Config.load
+    config = ZeroMcp::Config.new('tools' => tools_dir) if tools_dir
+  end
   server = ZeroMcp::Server.new(config)
   server.serve
 when 'audit'
@@ -17,7 +31,7 @@ when 'audit'
   $stderr.puts '[zeromcp] audit not yet implemented for Ruby'
 else
   $stderr.puts 'Usage:'
-  $stderr.puts '  zeromcp serve [tools-directory]'
+  $stderr.puts '  zeromcp serve [tools-directory] [--config <path>]'
   $stderr.puts '  zeromcp audit [tools-directory]'
   exit 1
 end

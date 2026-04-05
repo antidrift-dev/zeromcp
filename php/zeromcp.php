@@ -8,17 +8,34 @@ require_once __DIR__ . '/src/Sandbox.php';
 require_once __DIR__ . '/src/Scanner.php';
 require_once __DIR__ . '/src/Server.php';
 
-$command = $argv[1] ?? null;
-$toolsDir = $argv[2] ?? null;
+// Parse --config flag from argv
+$configPath = null;
+$filteredArgs = [];
+for ($i = 1; $i < count($argv); $i++) {
+    if ($argv[$i] === '--config' && isset($argv[$i + 1])) {
+        $configPath = $argv[$i + 1];
+        $i++; // skip next arg
+    } else {
+        $filteredArgs[] = $argv[$i];
+    }
+}
+
+$command = $filteredArgs[0] ?? null;
+$toolsDir = $filteredArgs[1] ?? null;
 
 if ($command !== 'serve') {
-    fwrite(STDERR, "Usage: zeromcp serve [tools-directory]\n");
+    fwrite(STDERR, "Usage: zeromcp serve [tools-directory] [--config <path>]\n");
     exit(1);
 }
 
-$config = ZeroMcp\Config::load();
-if ($toolsDir) {
-    $config = new ZeroMcp\Config(['tools' => $toolsDir]);
+if ($configPath) {
+    $data = json_decode(file_get_contents($configPath), true);
+    $config = new ZeroMcp\Config($data ?? []);
+} else {
+    $config = ZeroMcp\Config::load();
+    if ($toolsDir) {
+        $config = new ZeroMcp\Config(['tools' => $toolsDir]);
+    }
 }
 
 $server = new ZeroMcp\Server($config);

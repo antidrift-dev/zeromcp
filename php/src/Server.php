@@ -161,12 +161,14 @@ class Server
             $timeoutSecs = $tool->permissions['execute_timeout'] ?? $this->config->executeTimeout;
 
             // Use pcntl_alarm for timeout if available (POSIX systems)
-            $timedOut = false;
+            // pcntl_async_signals(true) enables signal delivery during blocking
+            // calls like sleep(), which pcntl_alarm alone cannot interrupt.
             if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
-                $previousHandler = null;
-                pcntl_signal(SIGALRM, function () use (&$timedOut) {
-                    $timedOut = true;
-                    throw new \RuntimeException("__ZEROMCP_TIMEOUT__");
+                if (function_exists('pcntl_async_signals')) {
+                    pcntl_async_signals(true);
+                }
+                pcntl_signal(SIGALRM, function () use ($name, $timeoutSecs) {
+                    throw new \RuntimeException("Tool \"$name\" timed out after {$timeoutSecs}s");
                 });
                 pcntl_alarm((int) $timeoutSecs);
             }
@@ -177,26 +179,18 @@ class Server
                 if (function_exists('pcntl_alarm')) {
                     pcntl_alarm(0); // Cancel alarm
                 }
-            }
-
-            if ($timedOut) {
-                return [
-                    'content' => [['type' => 'text', 'text' => "Tool \"$name\" timed out after {$timeoutSecs}s"]],
-                    'isError' => true,
-                ];
+                if (function_exists('pcntl_async_signals')) {
+                    pcntl_async_signals(false);
+                }
             }
 
             $text = is_string($result) ? $result : json_encode($result, JSON_UNESCAPED_SLASHES);
             return ['content' => [['type' => 'text', 'text' => $text]]];
         } catch (\RuntimeException $e) {
-            if ($e->getMessage() === '__ZEROMCP_TIMEOUT__') {
-                return [
-                    'content' => [['type' => 'text', 'text' => "Tool \"$name\" timed out after {$timeoutSecs}s"]],
-                    'isError' => true,
-                ];
-            }
+            $msg = $e->getMessage();
+            $text = str_starts_with($msg, 'Tool "') ? $msg : "Error: $msg";
             return [
-                'content' => [['type' => 'text', 'text' => "Error: {$e->getMessage()}"]],
+                'content' => [['type' => 'text', 'text' => $text]],
                 'isError' => true,
             ];
         } catch (\Throwable $e) {

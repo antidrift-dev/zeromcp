@@ -9,6 +9,13 @@
     "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.swiftdeps",
     "diagnostics": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Config.dia"
   },
+  "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Sandbox.swift": {
+    "dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.d",
+    "object": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swift.o",
+    "swiftmodule": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox~partial.swiftmodule",
+    "swift-dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.swiftdeps",
+    "diagnostics": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Sandbox.dia"
+  },
   "/Users/chriswelker/Projects/antidrift/zeromcp/swift/Sources/ZeroMcp/Schema.swift": {
     "dependencies": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.d",
     "object": "/Users/chriswelker/Projects/antidrift/zeromcp/swift/.build/arm64-apple-macosx/debug/ZeroMcp.build/Schema.swift.o",
