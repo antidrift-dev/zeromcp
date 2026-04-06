@@ -26,6 +26,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official Swift SDK requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation with native Swift async/await and zero external dependencies.
 
+In benchmarks, ZeroMCP Swift handles 7,947 requests/second over stdio versus the official SDK's 80 — 99x faster with 27% less memory (19 MB vs 26 MB). Over HTTP (Vapor), ZeroMCP serves 1,730 rps at 49-96 MB versus the official SDK's 74 rps at 25-39 MB. The official SDK takes 12ms per request and burns 1.76% CPU. ZeroMCP takes 0.48ms at 0.21% CPU.
+
+Swift passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
 ## HTTP / Streamable HTTP

@@ -28,6 +28,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official Java SDK (backed by Spring AI) requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation with a clean builder API &mdash; no Spring framework required, just a JAR.
 
+In benchmarks, ZeroMCP Java handles 11,168 requests/second over stdio versus the official SDK's 4,469 &mdash; 2.5x faster with 53% less memory (47 MB vs 99 MB). Over HTTP (Javalin), ZeroMCP serves 3,791 rps at 184-207 MB versus the official SDK's 2,658 rps at 203-217 MB.
+
+Java passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, filesystem controls, and exec prevention.
 
 ## HTTP / Streamable HTTP

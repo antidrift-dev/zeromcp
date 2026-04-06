@@ -67,7 +67,9 @@ export default {
 | Network sandboxing | None | Per-tool domain allowlists |
 | Credential isolation | None | Injected via `ctx.credentials` |
 | Filesystem/exec control | None | Declared per tool, enforced at runtime |
-| Cross-language conformance | Each SDK tested independently | One suite, 35+ tests, all 10 languages |
+| Cross-language conformance | Each SDK tested independently | 10 suites, 67 implementations, 0 failures |
+| Performance | No built-in benchmarking | 1.1x to 740x faster, benchmarked against all 10 official SDKs |
+| Chaos resilience | Not tested | 21-22/22 attacks survived across all 10 languages |
 
 ## Quick start
 
@@ -121,18 +123,18 @@ s.ServeStdio()
 
 ## Languages
 
-| Language | Directory | Runtime | Tool model |
-|----------|-----------|---------|------------|
-| [Node.js](nodejs/) | `nodejs/` | Node 14+ (also Bun, Deno) | Drop a `.js` file, it's a tool |
-| [Python](python/) | `python/` | Python 3.9+ | Drop a `.py` file, it's a tool |
-| [Ruby](ruby/) | `ruby/` | Ruby 3.0+ | Drop a `.rb` file, it's a tool |
-| [PHP](php/) | `php/` | PHP 8.1+ | Drop a `.php` file, it's a tool |
-| [Go](go/) | `go/` | Go 1.22+ | Register tools in code |
-| [Rust](rust/) | `rust/` | Rust 1.78+ | Register tools in code |
-| [Java](java/) | `java/` | Java 17+ | Register tools in code (builder API) |
-| [Kotlin](kotlin/) | `kotlin/` | Kotlin 2.0 / JVM 21 | Register tools in code (DSL) |
-| [Swift](swift/) | `swift/` | Swift 5.9+ / macOS 13+ | Register tools in code |
-| [C#](csharp/) | `csharp/` | .NET 8 | Register tools in code |
+| Language | Directory | Runtime | Tool model | Performance |
+|----------|-----------|---------|------------|-------------|
+| [Node.js](nodejs/) | `nodejs/` | Node 14+ (also Bun, Deno) | Drop a `.js` file, it's a tool | 1.6x faster, 23% less memory |
+| [Python](python/) | `python/` | Python 3.9+ | Drop a `.py` file, it's a tool | 12.7x faster, 59% less memory |
+| [Ruby](ruby/) | `ruby/` | Ruby 3.0+ | Drop a `.rb` file, it's a tool | 1.2x faster, 50% less memory |
+| [PHP](php/) | `php/` | PHP 8.1+ | Drop a `.php` file, it's a tool | 740x faster |
+| [Go](go/) | `go/` | Go 1.22+ | Register tools in code | 12.8x faster |
+| [Rust](rust/) | `rust/` | Rust 1.78+ | Register tools in code | 1.1x faster, 50% less memory |
+| [Java](java/) | `java/` | Java 17+ | Register tools in code (builder API) | 2.5x faster, 53% less memory |
+| [Kotlin](kotlin/) | `kotlin/` | Kotlin 2.0 / JVM 21 | Register tools in code (DSL) | 8.4x faster |
+| [Swift](swift/) | `swift/` | Swift 5.9+ / macOS 13+ | Register tools in code | 99x faster |
+| [C#](csharp/) | `csharp/` | .NET 8 | Register tools in code | 1.4x faster, 34% less memory |
 
 ## Sandbox
 
@@ -178,6 +180,29 @@ For local development, `"bypass_permissions": true` allows all access with warni
 ```
 [zeromcp] ⚠ fetch_data → GET unknown-host.com (not in allowlist — bypassed)
 ```
+
+## Performance
+
+Benchmarked against every official MCP SDK across all 10 languages.
+
+| Language | vs. Official SDK | HTTP throughput | Memory |
+|---|---|---|---|
+| Node.js | 1.6x faster | 4,539 rps | 22-26 MB |
+| Python | 12.7x faster | 2,623 rps | 27 MB |
+| Go | 12.8x faster | 4,024 rps | 21-23 MB |
+| Rust | 1.1x faster | 5,111 rps | 3-4 MB |
+| Java | 2.5x faster | 3,791 rps | 184-207 MB |
+| Kotlin | 8.4x faster | 2,848 rps | 188-194 MB |
+| Ruby | 1.2x faster | 3,217 rps | 26 MB |
+| PHP | 740x faster | 1,561 rps | 11-33 MB |
+| Swift | 99x faster | 1,730 rps | 49-96 MB |
+| C# | 1.4x faster | 4,421 rps | 126-314 MB |
+
+The "vs. Official SDK" column is stdio throughput (1,000 requests). ZeroMCP runs native inside your HTTP framework &mdash; no proxy, no subprocess. The official SDKs route HTTP through a stdio proxy, serializing every request through a single child process.
+
+Over sustained HTTP load (5 minutes), ZeroMCP is 1.4x to 92x faster than official SDKs across all 10 languages. The official Rust SDK leaks to 2.4 GB in 5 minutes; ZeroMCP Rust uses 3 MB.
+
+A 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse. ZeroMCP survives 21-22/22 attacks across all 10 languages. Official SDKs survive 19-20/21.
 
 ## Configuration
 
@@ -231,7 +256,7 @@ See [Node.js README](nodejs/) for examples with Express, Fastify, Hono, Cloudfla
 
 ## Testing
 
-A cross-language conformance suite validates all implementations against 35+ test cases covering protocol compliance, tool execution, input validation, error handling, and edge cases.
+A cross-language conformance suite validates all implementations across 10 suites and 67 test implementations covering protocol compliance, sandbox enforcement, timeout handling, credential isolation, namespace resolution, and HTTP transport. 0 failures, 0 skipped. Additionally, a 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse.
 
 ### Run with Docker (all languages)
 

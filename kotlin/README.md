@@ -30,6 +30,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official Kotlin SDK (backed by JetBrains) requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation with a clean Kotlin DSL and coroutine support.
 
+In benchmarks, ZeroMCP Kotlin handles 8,396 requests/second over stdio versus the official SDK's 998 — 8.4x faster. Over HTTP (Ktor), ZeroMCP serves 2,848 rps at 188-194 MB versus the official SDK's 548 rps at 145-204 MB. The official SDK requires Kotlin 2.2+; ZeroMCP works with Kotlin 2.0+.
+
+Kotlin passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, filesystem controls, and exec prevention.
 
 ## HTTP / Streamable HTTP

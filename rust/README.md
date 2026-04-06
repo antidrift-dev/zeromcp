@@ -42,6 +42,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official Rust SDK requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation.
 
+In benchmarks, ZeroMCP Rust handles 9,273 requests/second over stdio versus the official SDK's 8,114 — 1.1x faster with 50% less memory (2 MB vs 4 MB). Over HTTP (Actix), ZeroMCP serves 5,111 rps at 3-4 MB versus the official SDK's 2,452 rps — and the official SDK leaks memory from 18 MB to 2.4 GB over 5 minutes. ZeroMCP Rust stays flat at 3-4 MB. The official SDK requires Rust 1.88+; ZeroMCP works with Rust 1.78+.
+
+Rust passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists with `check_network()` and a permission model for filesystem and exec control.
 
 ## HTTP / Streamable HTTP

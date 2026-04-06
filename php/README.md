@@ -26,7 +26,11 @@ That's it. Stdio works immediately. Drop another `.php` file to add another tool
 
 The official PHP SDK (backed by The PHP Foundation) requires Composer, server setup, transport configuration, and explicit tool registration. ZeroMCP is file-based &mdash; each tool is its own file, discovered automatically. Pure PHP, no Composer, no extensions.
 
+In benchmarks, ZeroMCP PHP handles 13,333 requests/second over stdio versus the official SDK's 18 &mdash; 740x faster. Over HTTP (Slim), ZeroMCP serves 1,561 rps at 11-33 MB versus the official SDK's 17 rps at 31-64 MB. The official SDK takes 54ms per request. ZeroMCP takes 0.53ms. The official SDK corrupted responses on giant strings and slow tools in chaos testing. ZeroMCP survived 22/22 attacks.
+
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
+
+PHP passes all 10 conformance suites.
 
 ## HTTP / Streamable HTTP
 

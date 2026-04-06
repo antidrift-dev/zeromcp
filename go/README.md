@@ -38,6 +38,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official Go SDK (backed by Google) requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation &mdash; you just define tools as struct literals and call `ServeStdio()`.
 
+In benchmarks, ZeroMCP Go handles 13,317 requests/second over stdio versus the official SDK's 1,039 &mdash; 12.8x faster. Over HTTP (Chi), ZeroMCP serves 4,024 rps at 21&ndash;23 MB versus the official SDK's 893 rps at 30&ndash;44 MB. The official SDK requires Go 1.25+; ZeroMCP works with Go 1.22+.
+
+Go passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, credential isolation, and a sandboxed `Ctx.Fetch()`.
 
 ## HTTP / Streamable HTTP

@@ -25,7 +25,9 @@ That's it. Stdio transport works immediately. Drop another `.py` file to add ano
 
 The official Python SDK (FastMCP) requires a server object, decorators, and a `__main__` block. Adding a tool means editing server code and restarting. ZeroMCP is file-based &mdash; each tool is its own file, discovered automatically.
 
-The official SDK also pulls in pydantic, httpx, uvicorn, starlette, and more. **ZeroMCP uses only the standard library.**
+In benchmarks, ZeroMCP Python handles 12,936 requests/second over stdio versus the official SDK's 1,018 &mdash; 12.7x faster with 59% less memory. Over HTTP (Starlette), ZeroMCP serves 2,623 rps at 27 MB versus the official SDK's 635 rps at 80-87 MB. ZeroMCP uses only the standard library. The official SDK pulls in pydantic, httpx, uvicorn, and starlette just for stdio.
+
+Python passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
 
 The official SDK has **no sandbox**. ZeroMCP enforces per-tool network allowlists, credential isolation, and filesystem controls at runtime.
 

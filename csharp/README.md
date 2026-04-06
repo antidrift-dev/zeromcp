@@ -32,6 +32,10 @@ Stdio works immediately. No transport configuration needed.
 
 The official C# SDK (backed by Microsoft) requires server setup, transport configuration, and schema definition. ZeroMCP handles the protocol, transport, and schema generation with a clean async/await API.
 
+In benchmarks, ZeroMCP C# handles 14,013 requests/second over stdio versus the official SDK's 9,776 — 1.4x faster with 34% less memory (33 MB vs 50 MB). Over HTTP (ASP.NET), ZeroMCP serves 4,421 rps versus the official SDK's 2,517 rps.
+
+C# passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
+
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
 
 ## HTTP / Streamable HTTP

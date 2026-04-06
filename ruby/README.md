@@ -24,7 +24,11 @@ That's it. Stdio works immediately. Drop another `.rb` file to add another tool.
 
 The official Ruby SDK requires server setup, transport configuration, and explicit tool registration. ZeroMCP is file-based &mdash; each tool is its own file, discovered automatically. Zero external dependencies.
 
+In benchmarks, ZeroMCP Ruby handles 15,327 requests/second over stdio versus the official SDK's 12,935 &mdash; 1.2x faster with 50% less memory (12 MB vs 24 MB). Over HTTP (Rack+Puma), ZeroMCP serves 3,217 rps at 26 MB versus the official SDK's 2,163 rps at 49&ndash;56 MB. The official SDK crashed on binary garbage input and corrupted responses under slow tools in chaos testing. ZeroMCP survived 22/22 attacks.
+
 The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesystem, and exec permissions.
+
+Ruby passes all 10 conformance suites.
 
 ## HTTP / Streamable HTTP
 
