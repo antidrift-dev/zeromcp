@@ -13,9 +13,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          token: ${{ secrets.PAT_SUBTREE }}
 
       - name: Push subtree to zeromcp-go
+        env:
+          PAT: ${{ secrets.PAT_SUBTREE }}
         run: |
           SHA=$(git subtree split --prefix=go HEAD)
-          git push "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com/antidrift-dev/zeromcp-go.git" "$SHA:refs/heads/main" --force
-          git push "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com/antidrift-dev/zeromcp-go.git" "$SHA:refs/tags/${{ github.ref_name }}" --force
+          git -c http.extraheader="Authorization: token $PAT" push "https://github.com/antidrift-dev/zeromcp-go.git" "$SHA:refs/heads/main" --force
+          git -c http.extraheader="Authorization: token $PAT" push "https://github.com/antidrift-dev/zeromcp-go.git" "$SHA:refs/tags/${{ github.ref_name }}" --force
