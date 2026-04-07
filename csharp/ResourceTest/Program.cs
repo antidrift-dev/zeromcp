@@ -21,27 +21,19 @@ server.Tool("hello", new ToolDefinition
 // --- Resources ---
 
 server.Resource(
-    name: "status",
-    uri: "resource:///status",
-    description: "Current server status",
-    mimeType: "text/plain",
-    readFunc: async () => "OK"
-);
-
-server.Resource(
-    name: "config",
-    uri: "resource:///config",
-    description: "Server configuration as JSON",
+    name: "data.json",
+    uri: "resource:///data.json",
+    description: "Static JSON data",
     mimeType: "application/json",
-    readFunc: async () => """{"debug":false,"version":"0.2.0"}"""
+    readFunc: async () => """{"key":"value"}"""
 );
 
 server.Resource(
-    name: "readme",
-    uri: "resource:///readme",
-    description: "Project readme content",
+    name: "dynamic",
+    uri: "resource:///dynamic",
+    description: "A dynamic resource",
     mimeType: "text/plain",
-    readFunc: async () => "ZeroMcp Resource Test — a v0.2.0 conformance example."
+    readFunc: async () => "This is dynamic content"
 );
 
 // --- Prompt: greet ---

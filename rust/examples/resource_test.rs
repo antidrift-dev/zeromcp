@@ -33,7 +33,7 @@ async fn main() {
         mime_type: "application/json".to_string(),
         read: Box::new(|| {
             Box::pin(async {
-                Ok(json!({"items": [1, 2, 3], "status": "ok"}).to_string())
+                Ok(json!({"key": "value", "items": [1, 2, 3], "status": "ok"}).to_string())
             })
         }),
     });
@@ -77,23 +77,23 @@ async fn main() {
                 required: Some(true),
             },
             PromptArgument {
-                name: "style".to_string(),
-                description: Some("Greeting style: formal or casual".to_string()),
+                name: "tone".to_string(),
+                description: Some("Greeting tone: formal or casual".to_string()),
                 required: Some(false),
             },
         ]),
         render: Box::new(|args: Value| {
             Box::pin(async move {
                 let name = args["name"].as_str().unwrap_or("friend");
-                let style = args["style"].as_str().unwrap_or("casual");
+                let tone = args["tone"].as_str().unwrap_or("casual");
 
-                let greeting = match style {
+                let greeting = match tone {
                     "formal" => format!("Good day, {name}. How may I assist you?"),
                     _ => format!("Hey {name}! What's up?"),
                 };
 
                 Ok(vec![PromptMessage {
-                    role: "assistant".to_string(),
+                    role: "user".to_string(),
                     content: PromptContent::Text { text: greeting },
                 }])
             })

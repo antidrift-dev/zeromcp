@@ -20,23 +20,23 @@ public class ResourceTest {
 
         // 2a. Resource: data.json (static JSON blob)
         server.resource("data.json", ResourceDef.builder()
-            .uri("file:///data.json")
+            .uri("resource:///data.json")
             .description("Sample JSON data")
             .mimeType("application/json")
-            .read(() -> "{\"id\":1,\"active\":true}")
+            .read(() -> "{\"key\":\"value\",\"id\":1,\"active\":true}")
             .build());
 
         // 2b. Resource: dynamic (returns current timestamp)
         server.resource("dynamic", ResourceDef.builder()
-            .uri("custom://dynamic")
+            .uri("resource:///dynamic")
             .description("Dynamic resource that returns the current time")
             .mimeType("text/plain")
-            .read(() -> "now=" + Instant.now())
+            .read(() -> "dynamic: now=" + Instant.now())
             .build());
 
         // 2c. Resource: readme.md
         server.resource("readme.md", ResourceDef.builder()
-            .uri("file:///readme.md")
+            .uri("resource:///readme.md")
             .description("Project readme")
             .mimeType("text/markdown")
             .read(() -> "# ZeroMcp\nZero-config MCP for Java.")

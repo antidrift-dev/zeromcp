@@ -68,7 +68,7 @@ const protocolImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'Main'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'Main'],
     optional: true,
   },
   {
@@ -108,7 +108,7 @@ const sandboxImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'SandboxTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'SandboxTest'],
     optional: true,
   },
   {
@@ -176,7 +176,7 @@ const credentialImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CredentialTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CredentialTest'],
     env: { TEST_CRM_KEY: 'test-secret-123' },
     optional: true,
   },
@@ -353,7 +353,7 @@ const suites = [
       {
         name: 'Java',
         command: 'java',
-        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'TimeoutTest'],
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'TimeoutTest'],
         optional: true,
       },
       {
@@ -421,7 +421,7 @@ const suites = [
       {
         name: 'Java',
         command: 'java',
-        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'BypassTest'],
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'BypassTest'],
         env: { ZEROMCP_BYPASS: 'true' },
         optional: true,
       },

@@ -23,33 +23,22 @@ fun main() {
         }
     }
 
-    // --- Resource: static status page ---
-    server.resource("status") {
-        uri = "zeromcp://status"
-        description = "Server status"
+    // --- Resource: static JSON data ---
+    server.resource("data.json") {
+        uri = "resource:///data.json"
+        description = "Static JSON data"
         mimeType = "application/json"
         read {
-            """{"status":"ok","version":"0.2.0"}"""
+            """{"key":"value","items":[1,2,3]}"""
         }
     }
 
-    // --- Resource: readme (plain text) ---
-    server.resource("readme") {
-        uri = "zeromcp://readme"
-        description = "Project readme"
+    // --- Resource: dynamic content ---
+    server.resource("dynamic") {
+        uri = "resource:///dynamic"
+        description = "Dynamic content"
         read {
-            "ZeroMcp — zero-config MCP servers in every language."
-        }
-    }
-
-    // --- Resource template: user profile by id ---
-    server.resourceTemplate("user-profile") {
-        uriTemplate = "zeromcp://users/{userId}/profile"
-        description = "User profile by ID"
-        mimeType = "application/json"
-        read { params ->
-            val userId = params["userId"] ?: "unknown"
-            """{"userId":"$userId","name":"User $userId","active":true}"""
+            "This is dynamic content generated at runtime"
         }
     }
 

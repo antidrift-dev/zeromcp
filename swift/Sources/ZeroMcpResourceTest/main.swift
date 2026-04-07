@@ -13,25 +13,22 @@ server.tool(
     return "Hello, \(name)!"
 }
 
-// 2. Register a static resource
-server.resource("greeting", ResourceDefinition(
-    uri: "zeromcp://greeting",
-    name: "greeting",
-    description: "A friendly greeting message",
-    mimeType: "text/plain",
-    read: { "Hello from ZeroMcp resources!" }
+// 2. Register a static JSON resource
+server.resource("data.json", ResourceDefinition(
+    uri: "resource:///data.json",
+    name: "data.json",
+    description: "A static JSON data file",
+    mimeType: "application/json",
+    read: { "{\"key\": \"value\"}" }
 ))
 
-// 3. Register a resource template
-server.resourceTemplate("user-profile", ResourceTemplateDefinition(
-    uriTemplate: "zeromcp://users/{userId}/profile",
-    name: "user-profile",
-    description: "User profile by ID",
-    mimeType: "application/json",
-    read: { params in
-        let userId = params["userId"] ?? "unknown"
-        return "{\"userId\":\"\(userId)\",\"name\":\"User \(userId)\"}"
-    }
+// 3. Register a dynamic resource
+server.resource("dynamic", ResourceDefinition(
+    uri: "resource:///dynamic",
+    name: "dynamic",
+    description: "A dynamic resource",
+    mimeType: "text/plain",
+    read: { "This is dynamic content generated at runtime." }
 ))
 
 // 4. Register a prompt
