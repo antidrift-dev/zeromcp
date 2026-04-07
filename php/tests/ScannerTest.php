@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../src/Schema.php';
 require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/Tool.php';
+require_once __DIR__ . '/../src/Resource.php';
+require_once __DIR__ . '/../src/Prompt.php';
 require_once __DIR__ . '/../src/Scanner.php';
 
 use ZeroMcp\Config;

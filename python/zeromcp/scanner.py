@@ -6,7 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from .config import resolve_credentials, resolve_tool_sources
+from .config import resolve_credentials, resolve_sources, resolve_tool_sources
 from .sandbox import create_sandbox, validate_permissions
 from .schema import to_json_schema
 
@@ -131,6 +131,188 @@ class _ToolContext:
     def __init__(self, credentials=None, fetch=None):
         self.credentials = credentials
         self.fetch = fetch
+
+
+MIME_MAP = {
+    ".json": "application/json",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".html": "text/html",
+    ".xml": "application/xml",
+    ".yaml": "text/yaml",
+    ".yml": "text/yaml",
+    ".csv": "text/csv",
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".ts": "text/typescript",
+    ".sql": "text/plain",
+    ".sh": "text/plain",
+    ".rb": "text/plain",
+    ".go": "text/plain",
+    ".rs": "text/plain",
+    ".toml": "text/plain",
+    ".ini": "text/plain",
+    ".env": "text/plain",
+}
+
+
+class ResourceScanner:
+    """Scan directories for resource files.
+
+    Static files (json, md, txt, etc.) are served as-is.
+    .py files with a ``read()`` function are dynamic resources.
+    .py files with a ``uri_template`` field are resource templates.
+    """
+
+    def __init__(self, config: dict | None = None):
+        config = config or {}
+        self.resources: dict = {}
+        self.templates: dict = {}
+        self.dirs = [Path(s["path"]).resolve() for s in resolve_sources(config.get("resources"))]
+        self.separator: str = config.get("separator", "_")
+
+    def scan(self) -> None:
+        self.resources.clear()
+        self.templates.clear()
+        for d in self.dirs:
+            self._scan_dir(d, d)
+
+    def _scan_dir(self, base_dir: Path, current_dir: Path) -> None:
+        try:
+            entries = sorted(current_dir.iterdir())
+        except OSError:
+            return
+
+        for entry in entries:
+            if entry.is_dir():
+                self._scan_dir(base_dir, entry)
+            elif entry.is_file():
+                rel = entry.relative_to(base_dir)
+                name = rel.with_suffix("").as_posix().replace("/", self.separator)
+                ext = entry.suffix.lower()
+
+                if ext == ".py":
+                    self._load_dynamic(entry, name)
+                elif ext in MIME_MAP:
+                    self._load_static(entry, rel.as_posix(), name, ext)
+
+    def _load_dynamic(self, file_path: Path, name: str) -> None:
+        try:
+            mod = _import_file(file_path)
+        except Exception as exc:
+            _log(f"Error loading resource {file_path}: {exc}")
+            return
+
+        read_fn = getattr(mod, "read", None)
+        if not callable(read_fn):
+            return
+
+        uri_template = getattr(mod, "uri_template", None)
+        description = getattr(mod, "description", None)
+        mime_type = getattr(mod, "mime_type", None)
+
+        if uri_template:
+            self.templates[name] = {
+                "uri_template": uri_template,
+                "name": name,
+                "description": description,
+                "mime_type": mime_type or "text/plain",
+                "read": read_fn,
+            }
+        else:
+            uri = getattr(mod, "uri", None) or f"resource:///{name}"
+            self.resources[name] = {
+                "uri": uri,
+                "name": name,
+                "description": description,
+                "mime_type": mime_type or "application/json",
+                "read": read_fn,
+            }
+
+    def _load_static(self, file_path: Path, rel_path: str, name: str, ext: str) -> None:
+        uri = f"resource:///{rel_path}"
+        mime_type = MIME_MAP.get(ext, "application/octet-stream")
+
+        def make_reader(fp: Path):
+            async def read_static():
+                return fp.read_text(encoding="utf-8")
+            return read_static
+
+        self.resources[name] = {
+            "uri": uri,
+            "name": name,
+            "description": f"Static resource: {rel_path}",
+            "mime_type": mime_type,
+            "read": make_reader(file_path),
+        }
+
+
+class PromptScanner:
+    """Scan directories for prompt .py files.
+
+    Each .py file must export a ``render(args)`` function.
+    May also export ``description`` and ``arguments``.
+    """
+
+    def __init__(self, config: dict | None = None):
+        config = config or {}
+        self.prompts: dict = {}
+        self.dirs = [Path(s["path"]).resolve() for s in resolve_sources(config.get("prompts"))]
+        self.separator: str = config.get("separator", "_")
+
+    def scan(self) -> None:
+        self.prompts.clear()
+        for d in self.dirs:
+            self._scan_dir(d, d)
+
+    def _scan_dir(self, base_dir: Path, current_dir: Path) -> None:
+        try:
+            entries = sorted(current_dir.iterdir())
+        except OSError:
+            return
+
+        for entry in entries:
+            if entry.is_dir():
+                self._scan_dir(base_dir, entry)
+            elif entry.is_file() and entry.suffix == ".py":
+                rel = entry.relative_to(base_dir)
+                name = rel.with_suffix("").as_posix().replace("/", self.separator)
+                self._load_prompt(entry, name)
+
+    def _load_prompt(self, file_path: Path, name: str) -> None:
+        try:
+            mod = _import_file(file_path)
+        except Exception as exc:
+            _log(f"Error loading prompt {file_path}: {exc}")
+            return
+
+        render_fn = getattr(mod, "render", None)
+        if not callable(render_fn):
+            _log(f"Prompt {file_path}: missing render() function")
+            return
+
+        description = getattr(mod, "description", None)
+        raw_args = getattr(mod, "arguments", None)
+
+        # Convert input schema shorthand to MCP prompt arguments
+        prompt_args: list[dict] = []
+        if raw_args and isinstance(raw_args, dict):
+            for key, val in raw_args.items():
+                if isinstance(val, str):
+                    prompt_args.append({"name": key, "required": True})
+                elif isinstance(val, dict):
+                    arg: dict = {"name": key}
+                    if "description" in val:
+                        arg["description"] = val["description"]
+                    arg["required"] = not val.get("optional", False)
+                    prompt_args.append(arg)
+
+        self.prompts[name] = {
+            "name": name,
+            "description": description,
+            "arguments": prompt_args if prompt_args else None,
+            "render": render_fn,
+        }
 
 
 def _import_file(file_path: Path):

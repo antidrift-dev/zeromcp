@@ -7,7 +7,20 @@ import Glibc
 
 public class ZeroMcp {
     private var tools: [String: ToolDefinition] = [:]
+    private var resources: [String: ResourceDefinition] = [:]
+    private var templates: [String: ResourceTemplateDefinition] = [:]
+    private var prompts: [String: PromptDefinition] = [:]
+    private var subscriptions: Set<String> = []
+    private var logLevel: String = "info"
+    private var roots: [[String: Any]] = []
+    private var clientCapabilities: [String: Any] = [:]
     private let config: ZeroMcpConfig
+
+    /// Optional icon URI included in list responses.
+    public var icon: String?
+
+    /// Page size for cursor-based pagination. 0 means no pagination.
+    public var pageSize: Int = 0
 
     public init(config: ZeroMcpConfig? = nil) {
         self.config = config ?? ZeroMcpConfig.load()
@@ -41,6 +54,21 @@ public class ZeroMcp {
             input: b.input,
             execute: execute
         )
+    }
+
+    // Register a static resource
+    public func resource(_ name: String, _ definition: ResourceDefinition) {
+        resources[name] = definition
+    }
+
+    // Register a resource template
+    public func resourceTemplate(_ name: String, _ definition: ResourceTemplateDefinition) {
+        templates[name] = definition
+    }
+
+    // Register a prompt
+    public func prompt(_ name: String, _ definition: PromptDefinition) {
+        prompts[name] = definition
     }
 
     public func serve() async {
@@ -80,37 +108,48 @@ public class ZeroMcp {
         let method = request["method"] as? String ?? ""
         let params = request["params"] as? [String: Any] ?? [:]
 
-        if id == nil && method == "notifications/initialized" {
+        // Notifications (no id) — no response expected
+        if id == nil {
+            handleNotification(method, params)
             return nil
         }
 
         switch method {
         case "initialize":
-            return makeResponse(id: id, result: [
-                "protocolVersion": "2024-11-05",
-                "capabilities": [
-                    "tools": ["listChanged": true]
-                ],
-                "serverInfo": [
-                    "name": "zeromcp",
-                    "version": "0.1.1"
-                ]
-            ])
-
-        case "tools/list":
-            return makeResponse(id: id, result: [
-                "tools": buildToolList()
-            ])
-
-        case "tools/call":
-            let result = await callTool(params)
-            return makeResponse(id: id, result: result)
+            return handleInitialize(id: id, params: params)
 
         case "ping":
             return makeResponse(id: id, result: [:] as [String: Any])
 
+        // Tools
+        case "tools/list":
+            return handleToolsList(id: id, params: params)
+        case "tools/call":
+            return await handleToolsCall(id: id, params: params)
+
+        // Resources
+        case "resources/list":
+            return handleResourcesList(id: id, params: params)
+        case "resources/read":
+            return await handleResourcesRead(id: id, params: params)
+        case "resources/subscribe":
+            return handleResourcesSubscribe(id: id, params: params)
+        case "resources/templates/list":
+            return handleResourcesTemplatesList(id: id, params: params)
+
+        // Prompts
+        case "prompts/list":
+            return handlePromptsList(id: id, params: params)
+        case "prompts/get":
+            return await handlePromptsGet(id: id, params: params)
+
+        // Passthrough
+        case "logging/setLevel":
+            return handleLoggingSetLevel(id: id, params: params)
+        case "completion/complete":
+            return handleCompletionComplete(id: id, params: params)
+
         default:
-            if id == nil { return nil }
             return [
                 "jsonrpc": "2.0",
                 "id": id as Any,
@@ -119,8 +158,218 @@ public class ZeroMcp {
         }
     }
 
+    // MARK: - Notifications
+
+    private func handleNotification(_ method: String, _ params: [String: Any]) {
+        switch method {
+        case "notifications/initialized":
+            break
+        case "notifications/roots/list_changed":
+            if let r = params["roots"] as? [[String: Any]] {
+                roots = r
+            }
+        default:
+            break
+        }
+    }
+
+    // MARK: - Initialize
+
+    private func handleInitialize(id: Any?, params: [String: Any]) -> [String: Any] {
+        if let caps = params["capabilities"] as? [String: Any] {
+            clientCapabilities = caps
+        }
+
+        var capabilities: [String: Any] = [
+            "tools": ["listChanged": true]
+        ]
+
+        if !resources.isEmpty || !templates.isEmpty {
+            capabilities["resources"] = ["subscribe": true, "listChanged": true] as [String: Any]
+        }
+
+        if !prompts.isEmpty {
+            capabilities["prompts"] = ["listChanged": true]
+        }
+
+        capabilities["logging"] = [:] as [String: Any]
+
+        var serverInfo: [String: Any] = [
+            "name": "zeromcp",
+            "version": "0.2.0"
+        ]
+        if let icon = icon {
+            serverInfo["icon"] = icon
+        }
+
+        return makeResponse(id: id, result: [
+            "protocolVersion": "2024-11-05",
+            "capabilities": capabilities,
+            "serverInfo": serverInfo
+        ])
+    }
+
+    // MARK: - Tools
+
+    private func handleToolsList(id: Any?, params: [String: Any]) -> [String: Any] {
+        let cursor = params["cursor"] as? String
+        let list = buildToolList()
+        let page = paginate(list, cursor: cursor, pageSize: pageSize)
+        var result: [String: Any] = ["tools": page.items]
+        if let next = page.nextCursor { result["nextCursor"] = next }
+        return makeResponse(id: id, result: result)
+    }
+
+    private func handleToolsCall(id: Any?, params: [String: Any]) async -> [String: Any] {
+        let result = await callTool(params)
+        return makeResponse(id: id, result: result)
+    }
+
+    // MARK: - Resources
+
+    private func handleResourcesList(id: Any?, params: [String: Any]) -> [String: Any] {
+        let cursor = params["cursor"] as? String
+        var list: [[String: Any]] = []
+        for (_, res) in resources.sorted(by: { $0.key < $1.key }) {
+            var entry: [String: Any] = [
+                "uri": res.uri,
+                "name": res.name,
+                "mimeType": res.mimeType
+            ]
+            if let desc = res.description { entry["description"] = desc }
+            if let icon = icon { entry["icons"] = [["uri": icon]] }
+            list.append(entry)
+        }
+        let page = paginate(list, cursor: cursor, pageSize: pageSize)
+        var result: [String: Any] = ["resources": page.items]
+        if let next = page.nextCursor { result["nextCursor"] = next }
+        return makeResponse(id: id, result: result)
+    }
+
+    private func handleResourcesRead(id: Any?, params: [String: Any]) async -> [String: Any] {
+        let uri = params["uri"] as? String ?? ""
+
+        // Check static resources
+        for (_, res) in resources {
+            if res.uri == uri {
+                do {
+                    let text = try await res.read()
+                    return makeResponse(id: id, result: [
+                        "contents": [["uri": uri, "mimeType": res.mimeType, "text": text]]
+                    ])
+                } catch {
+                    return makeError(id: id, code: -32603, message: "Error reading resource: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        // Check templates
+        for (_, tmpl) in templates {
+            if let match = matchTemplate(tmpl.uriTemplate, uri: uri) {
+                do {
+                    let text = try await tmpl.read(match)
+                    return makeResponse(id: id, result: [
+                        "contents": [["uri": uri, "mimeType": tmpl.mimeType, "text": text]]
+                    ])
+                } catch {
+                    return makeError(id: id, code: -32603, message: "Error reading resource: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        return makeError(id: id, code: -32002, message: "Resource not found: \(uri)")
+    }
+
+    private func handleResourcesSubscribe(id: Any?, params: [String: Any]) -> [String: Any] {
+        if let uri = params["uri"] as? String {
+            subscriptions.insert(uri)
+        }
+        return makeResponse(id: id, result: [:] as [String: Any])
+    }
+
+    private func handleResourcesTemplatesList(id: Any?, params: [String: Any]) -> [String: Any] {
+        let cursor = params["cursor"] as? String
+        var list: [[String: Any]] = []
+        for (_, tmpl) in templates.sorted(by: { $0.key < $1.key }) {
+            var entry: [String: Any] = [
+                "uriTemplate": tmpl.uriTemplate,
+                "name": tmpl.name,
+                "mimeType": tmpl.mimeType
+            ]
+            if let desc = tmpl.description { entry["description"] = desc }
+            if let icon = icon { entry["icons"] = [["uri": icon]] }
+            list.append(entry)
+        }
+        let page = paginate(list, cursor: cursor, pageSize: pageSize)
+        var result: [String: Any] = ["resourceTemplates": page.items]
+        if let next = page.nextCursor { result["nextCursor"] = next }
+        return makeResponse(id: id, result: result)
+    }
+
+    // MARK: - Prompts
+
+    private func handlePromptsList(id: Any?, params: [String: Any]) -> [String: Any] {
+        let cursor = params["cursor"] as? String
+        var list: [[String: Any]] = []
+        for (_, prompt) in prompts.sorted(by: { $0.key < $1.key }) {
+            var entry: [String: Any] = ["name": prompt.name]
+            if let desc = prompt.description { entry["description"] = desc }
+            if let args = prompt.arguments {
+                entry["arguments"] = args.map { $0.toDict() }
+            }
+            if let icon = icon { entry["icons"] = [["uri": icon]] }
+            list.append(entry)
+        }
+        let page = paginate(list, cursor: cursor, pageSize: pageSize)
+        var result: [String: Any] = ["prompts": page.items]
+        if let next = page.nextCursor { result["nextCursor"] = next }
+        return makeResponse(id: id, result: result)
+    }
+
+    private func handlePromptsGet(id: Any?, params: [String: Any]) async -> [String: Any] {
+        let name = params["name"] as? String ?? ""
+        let args = params["arguments"] as? [String: Any] ?? [:]
+
+        guard let prompt = prompts[name] else {
+            return makeError(id: id, code: -32002, message: "Prompt not found: \(name)")
+        }
+
+        do {
+            let messages = try await prompt.render(args)
+            return makeResponse(id: id, result: ["messages": messages])
+        } catch {
+            return makeError(id: id, code: -32603, message: "Error rendering prompt: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Passthrough
+
+    private func handleLoggingSetLevel(id: Any?, params: [String: Any]) -> [String: Any] {
+        if let level = params["level"] as? String {
+            logLevel = level
+        }
+        return makeResponse(id: id, result: [:] as [String: Any])
+    }
+
+    private func handleCompletionComplete(id: Any?, params: [String: Any]) -> [String: Any] {
+        return makeResponse(id: id, result: ["completion": ["values": [] as [Any]]])
+    }
+
+    // MARK: - Helpers
+
     private func makeResponse(id: Any?, result: Any) -> [String: Any] {
         var response: [String: Any] = ["jsonrpc": "2.0", "result": result]
+        if let id = id {
+            response["id"] = id
+        }
+        return response
+    }
+
+    private func makeError(id: Any?, code: Int, message: String) -> [String: Any] {
+        var response: [String: Any] = [
+            "jsonrpc": "2.0",
+            "error": ["code": code, "message": message] as [String: Any]
+        ]
         if let id = id {
             response["id"] = id
         }
@@ -144,11 +393,13 @@ public class ZeroMcp {
             }
             schemaDict["properties"] = propsDict
 
-            return [
+            var entry: [String: Any] = [
                 "name": name,
                 "description": tool.description,
                 "inputSchema": schemaDict
             ]
+            if let icon = icon { entry["icons"] = [["uri": icon]] }
+            return entry
         }.sorted { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }
     }
 
@@ -211,6 +462,82 @@ public class ZeroMcp {
                 "isError": true
             ]
         }
+    }
+
+    // MARK: - Pagination
+
+    private struct PaginatedResult {
+        let items: [[String: Any]]
+        let nextCursor: String?
+    }
+
+    private func paginate(_ items: [[String: Any]], cursor: String?, pageSize: Int) -> PaginatedResult {
+        guard pageSize > 0 else {
+            return PaginatedResult(items: items, nextCursor: nil)
+        }
+
+        let offset = cursor.flatMap { decodeCursor($0) } ?? 0
+        let end = min(offset + pageSize, items.count)
+        let slice = Array(items[offset..<end])
+        let hasMore = end < items.count
+
+        return PaginatedResult(
+            items: slice,
+            nextCursor: hasMore ? encodeCursor(end) : nil
+        )
+    }
+
+    private func encodeCursor(_ offset: Int) -> String {
+        let data = String(offset).data(using: .utf8)!
+        return data.base64EncodedString()
+    }
+
+    private func decodeCursor(_ cursor: String) -> Int? {
+        guard let data = Data(base64Encoded: cursor),
+              let str = String(data: data, encoding: .utf8),
+              let offset = Int(str), offset >= 0 else {
+            return nil
+        }
+        return offset
+    }
+
+    // MARK: - Template matching
+
+    private func matchTemplate(_ template: String, uri: String) -> [String: String]? {
+        // Convert {param} placeholders to named regex groups
+        var regexPattern = "^"
+        var paramNames: [String] = []
+        var remaining = template[template.startIndex...]
+
+        while let openRange = remaining.range(of: "{") {
+            // Append literal text before the placeholder
+            regexPattern += NSRegularExpression.escapedPattern(for: String(remaining[remaining.startIndex..<openRange.lowerBound]))
+
+            let afterOpen = openRange.upperBound
+            guard let closeRange = remaining[afterOpen...].range(of: "}") else { break }
+
+            let paramName = String(remaining[afterOpen..<closeRange.lowerBound])
+            paramNames.append(paramName)
+            regexPattern += "([^/]+)"
+
+            remaining = remaining[closeRange.upperBound...]
+        }
+        regexPattern += NSRegularExpression.escapedPattern(for: String(remaining))
+        regexPattern += "$"
+
+        guard let regex = try? NSRegularExpression(pattern: regexPattern),
+              let match = regex.firstMatch(in: uri, range: NSRange(uri.startIndex..., in: uri)),
+              match.numberOfRanges == paramNames.count + 1 else {
+            return nil
+        }
+
+        var result: [String: String] = [:]
+        for (i, name) in paramNames.enumerated() {
+            if let range = Range(match.range(at: i + 1), in: uri) {
+                result[name] = String(uri[range])
+            }
+        }
+        return result
     }
 }
 

@@ -33,6 +33,21 @@ def resolve_tool_sources(tools=None) -> list[dict]:
     return result
 
 
+def resolve_sources(raw) -> list[dict]:
+    """Normalize a source config (string, list of strings/dicts) into [{path, ...}]."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [{"path": raw}]
+    result = []
+    for item in raw:
+        if isinstance(item, str):
+            result.append({"path": item})
+        else:
+            result.append(item)
+    return result
+
+
 def resolve_transports(config: dict) -> list[dict]:
     """Resolve transport configuration. Defaults to stdio."""
     transport = config.get("transport")
@@ -84,6 +99,61 @@ def resolve_auth(auth: str | None) -> str | None:
             _log(f"Warning: environment variable {env_var} not set")
         return value
     return auth
+
+
+ICON_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".webp": "image/webp",
+}
+
+
+def resolve_icon(icon: str | None) -> str | None:
+    """Resolve an icon config value to a data URI.
+
+    Accepts: data URI (passthrough), URL (fetched), file path (read).
+    """
+    import base64
+    import urllib.request
+
+    if not icon:
+        return None
+
+    # Already a data URI
+    if icon.startswith("data:"):
+        return icon
+
+    # URL — fetch and convert
+    if icon.startswith("http://") or icon.startswith("https://"):
+        try:
+            req = urllib.request.Request(icon)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                content_type = resp.headers.get("Content-Type", "image/png")
+                data = resp.read()
+                b64 = base64.b64encode(data).decode("ascii")
+                return f"data:{content_type};base64,{b64}"
+        except Exception as exc:
+            _log(f"Warning: failed to fetch icon {icon}: {exc}")
+            return None
+
+    # File path
+    try:
+        file_path = icon
+        if file_path.startswith("~"):
+            file_path = str(Path.home()) + file_path[1:]
+        p = Path(file_path)
+        data = p.read_bytes()
+        ext = p.suffix.lower()
+        mime = ICON_MIME.get(ext, "image/png")
+        b64 = base64.b64encode(data).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+    except Exception as exc:
+        _log(f"Warning: failed to read icon file {icon}: {exc}")
+        return None
 
 
 def _log(msg: str) -> None:

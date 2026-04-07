@@ -27,3 +27,40 @@ public class ToolDefinition
     /// <summary>Cached JSON schema, computed once at registration time.</summary>
     internal JsonSchema? CachedSchema { get; set; }
 }
+
+// --- Resources ---
+
+public class ResourceDefinition
+{
+    public string Uri { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public string MimeType { get; set; } = "text/plain";
+    public Func<Task<string>>? Read { get; set; }
+}
+
+public class ResourceTemplateDefinition
+{
+    public string UriTemplate { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public string MimeType { get; set; } = "text/plain";
+    public Func<Dictionary<string, string>, Task<string>>? Read { get; set; }
+}
+
+// --- Prompts ---
+
+public class PromptArgument
+{
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public bool Required { get; set; }
+}
+
+public class PromptDefinition
+{
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public List<PromptArgument>? Arguments { get; set; }
+    public Func<Dictionary<string, string>, Task<List<Dictionary<string, object>>>>? Render { get; set; }
+}

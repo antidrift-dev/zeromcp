@@ -15,6 +15,8 @@ type Config struct {
 	Separator         string                       `json:"separator,omitempty"`
 	Credentials       map[string]CredentialSource   `json:"credentials,omitempty"`
 	ExecuteTimeout    int                          `json:"execute_timeout,omitempty"` // ms, default 30000
+	PageSize          int                          `json:"page_size,omitempty"`       // 0 = no pagination
+	Icon              string                       `json:"icon,omitempty"`            // data URI, URL, or file path (resolved at startup)
 }
 
 // TransportConfig defines a transport type and its settings.

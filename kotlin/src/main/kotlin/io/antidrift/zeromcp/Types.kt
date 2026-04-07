@@ -82,6 +82,63 @@ data class ToolDefinition(
 )
 
 /**
+ * Registered resource definition.
+ */
+data class ResourceDefinition(
+    val uri: String,
+    val name: String,
+    val description: String = "",
+    val mimeType: String = "text/plain",
+    val read: suspend () -> String
+)
+
+/**
+ * Registered resource template definition.
+ */
+data class ResourceTemplateDefinition(
+    val uriTemplate: String,
+    val name: String,
+    val description: String = "",
+    val mimeType: String = "text/plain",
+    val read: suspend (params: Map<String, String>) -> String
+)
+
+/**
+ * A single prompt argument declaration.
+ */
+data class PromptArgument(
+    val name: String,
+    val description: String? = null,
+    val required: Boolean = false
+)
+
+/**
+ * A prompt message returned from render.
+ */
+data class PromptMessage(
+    val role: String,
+    val content: PromptContent
+)
+
+/**
+ * Content inside a prompt message.
+ */
+data class PromptContent(
+    val type: String = "text",
+    val text: String
+)
+
+/**
+ * Registered prompt definition.
+ */
+data class PromptDefinition(
+    val name: String,
+    val description: String? = null,
+    val arguments: List<PromptArgument> = emptyList(),
+    val render: suspend (args: Map<String, Any?>) -> List<PromptMessage>
+)
+
+/**
  * DSL builder for defining a tool.
  */
 class ToolBuilder(private val name: String) {
@@ -114,6 +171,96 @@ class ToolBuilder(private val name: String) {
             permissions = perms,
             execute = executeFn ?: throw IllegalStateException("Tool '$name' has no execute block")
         )
+    }
+}
+
+/**
+ * DSL builder for defining a resource.
+ */
+class ResourceBuilder(private val name: String) {
+    var uri: String = ""
+    var description: String = ""
+    var mimeType: String = "text/plain"
+    private var readFn: (suspend () -> String)? = null
+
+    fun read(fn: suspend () -> String) {
+        readFn = fn
+    }
+
+    internal fun build(): ResourceDefinition {
+        require(uri.isNotBlank()) { "Resource '$name' must have a uri" }
+        return ResourceDefinition(
+            uri = uri,
+            name = name,
+            description = description,
+            mimeType = mimeType,
+            read = readFn ?: throw IllegalStateException("Resource '$name' has no read block")
+        )
+    }
+}
+
+/**
+ * DSL builder for defining a resource template.
+ */
+class ResourceTemplateBuilder(private val name: String) {
+    var uriTemplate: String = ""
+    var description: String = ""
+    var mimeType: String = "text/plain"
+    private var readFn: (suspend (Map<String, String>) -> String)? = null
+
+    fun read(fn: suspend (params: Map<String, String>) -> String) {
+        readFn = fn
+    }
+
+    internal fun build(): ResourceTemplateDefinition {
+        require(uriTemplate.isNotBlank()) { "Resource template '$name' must have a uriTemplate" }
+        return ResourceTemplateDefinition(
+            uriTemplate = uriTemplate,
+            name = name,
+            description = description,
+            mimeType = mimeType,
+            read = readFn ?: throw IllegalStateException("Resource template '$name' has no read block")
+        )
+    }
+}
+
+/**
+ * DSL builder for defining a prompt.
+ */
+class PromptBuilder(private val name: String) {
+    var description: String? = null
+    private val args = mutableListOf<PromptArgument>()
+    private var renderFn: (suspend (Map<String, Any?>) -> List<PromptMessage>)? = null
+
+    fun arguments(block: PromptArgumentsBuilder.() -> Unit) {
+        val builder = PromptArgumentsBuilder()
+        builder.block()
+        args.addAll(builder.args)
+    }
+
+    fun render(fn: suspend (args: Map<String, Any?>) -> List<PromptMessage>) {
+        renderFn = fn
+    }
+
+    internal fun build(): PromptDefinition {
+        return PromptDefinition(
+            name = name,
+            description = description,
+            arguments = args.toList(),
+            render = renderFn ?: throw IllegalStateException("Prompt '$name' has no render block")
+        )
+    }
+}
+
+class PromptArgumentsBuilder {
+    internal val args = mutableListOf<PromptArgument>()
+
+    fun required(name: String, description: String? = null) {
+        args.add(PromptArgument(name, description, required = true))
+    }
+
+    fun optional(name: String, description: String? = null) {
+        args.add(PromptArgument(name, description, required = false))
     }
 }
 
