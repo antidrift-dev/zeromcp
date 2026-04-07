@@ -256,8 +256,43 @@ const resourceImplementations = [
     args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'resource-config-php.json')],
     optional: true,
   },
-  // Code-based languages need example binaries with resources/prompts registered
-  // Go, Rust, Java, Kotlin, Swift, C# — added when Docker conformance is set up
+  {
+    name: 'Go',
+    command: join(root, 'go/examples/resource-test/resource-test'),
+    args: [],
+    optional: true,
+  },
+  {
+    name: 'Rust',
+    command: join(root, 'rust/target/release/examples/resource_test'),
+    args: [],
+    optional: true,
+  },
+  {
+    name: 'Java',
+    command: 'java',
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'ResourceTest'],
+    optional: true,
+  },
+  {
+    name: 'Kotlin',
+    command: join(root, 'kotlin/example/build/install/example/bin/example'),
+    args: [],
+    env: { JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF-8', ZEROMCP_RESOURCE_TEST: 'true' },
+    optional: true,
+  },
+  {
+    name: 'Swift',
+    command: existsSync(join(root, 'swift/.build/release/zeromcp-resource-test')) ? join(root, 'swift/.build/release/zeromcp-resource-test') : join(root, 'swift/.build/debug/zeromcp-resource-test'),
+    args: [],
+    optional: true,
+  },
+  {
+    name: 'C#',
+    command: existsSync('/tmp/csharp-resource-out/ResourceTest') ? '/tmp/csharp-resource-out/ResourceTest' : 'dotnet',
+    args: existsSync('/tmp/csharp-resource-out/ResourceTest') ? [] : ['run', '--project', join(root, 'csharp/ResourceTest'), '--no-build'],
+    optional: true,
+  },
 ];
 
 const suites = [
