@@ -39,6 +39,9 @@ export interface Config {
   credentials?: Record<string, CredentialSource>;
   remote?: RemoteServer[];
   execute_timeout?: number; // ms, default 30000
+  page_size?: number; // 0 = no pagination (default)
+  resources?: string | (string | ToolSource)[];
+  prompts?: string | (string | ToolSource)[];
 }
 
 export function resolveToolSources(tools?: string | (string | ToolSource)[]): ToolSource[] {
