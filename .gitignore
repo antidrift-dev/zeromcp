@@ -6,3 +6,11 @@ __pycache__/
 target/
 build/
 .gradle/
+
+# Build artifacts
+*.egg-info/
+*.gem
+*.whl
+dist/
+__pycache__/
+*.pyc
