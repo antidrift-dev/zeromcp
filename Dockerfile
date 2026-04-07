@@ -88,12 +88,13 @@ RUN cd java && mvn package -q -DskipTests && \
     mvn dependency:copy-dependencies -DoutputDirectory=target/deps -q && \
     mkdir -p /tmp/java-out && \
     javac -cp "target/zeromcp-0.1.1.jar:target/deps/*" \
-      -d /tmp/java-out src/main/java/Main.java \
-      src/main/java/SandboxTest.java \
-      src/main/java/ChaosTest.java \
-      src/main/java/TimeoutTest.java \
-      src/main/java/BypassTest.java \
-      src/main/java/CredentialTest.java \
+      -d /tmp/java-out \
+      example/src/main/java/Main.java \
+      example/src/main/java/SandboxTest.java \
+      example/src/main/java/ChaosTest.java \
+      example/src/main/java/TimeoutTest.java \
+      example/src/main/java/BypassTest.java \
+      example/src/main/java/CredentialTest.java \
       src/main/java/ResourceTest.java 2>&1 || echo "Java example build failed"
 
 # Build Kotlin — library + example distribution
