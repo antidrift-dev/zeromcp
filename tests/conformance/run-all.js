@@ -258,7 +258,7 @@ const resourceImplementations = [
   },
   {
     name: 'Go',
-    command: join(root, 'go/examples/resource-test/resource-test'),
+    command: existsSync('/usr/local/bin/zeromcp-go-resource') ? 'zeromcp-go-resource' : join(root, 'go/examples/resource-test/resource-test'),
     args: [],
     optional: true,
   },
@@ -283,7 +283,7 @@ const resourceImplementations = [
   },
   {
     name: 'Swift',
-    command: existsSync(join(root, 'swift/.build/release/zeromcp-resource-test')) ? join(root, 'swift/.build/release/zeromcp-resource-test') : join(root, 'swift/.build/debug/zeromcp-resource-test'),
+    command: existsSync('/usr/local/bin/zeromcp-swift-resource') ? '/usr/local/bin/zeromcp-swift-resource' : join(root, 'swift/.build/debug/zeromcp-resource-test'),
     args: [],
     optional: true,
   },

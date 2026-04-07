@@ -68,9 +68,10 @@ RUN cd go && go build -o /usr/local/bin/zeromcp-go-timeout ./examples/timeout-te
 RUN cd go && go build -o /usr/local/bin/zeromcp-go-bypass ./examples/bypass-test/
 RUN cd go && go build -o /usr/local/bin/zeromcp-go-cli ./cmd/zeromcp/
 RUN cd go && go build -o /usr/local/bin/zeromcp-go-advanced ./examples/advanced/
+RUN cd go && go build -o /usr/local/bin/zeromcp-go-resource ./examples/resource-test/
 
 # Build Rust
-RUN cd rust && cargo build --example hello --example sandbox_test --example chaos_test --example timeout_test --example bypass_test --example credential_test --release
+RUN cd rust && cargo build --example hello --example sandbox_test --example chaos_test --example timeout_test --example bypass_test --example credential_test --example resource_test --release
 
 # Build Swift (clean build inside Linux container)
 RUN cd swift && rm -rf .build && swift build 2>&1; \
@@ -79,19 +80,21 @@ RUN cd swift && rm -rf .build && swift build 2>&1; \
     test -f .build/debug/zeromcp-chaos-test && cp .build/debug/zeromcp-chaos-test /usr/local/bin/zeromcp-swift-chaos || echo "Swift chaos build failed"; \
     test -f .build/debug/zeromcp-timeout-test && cp .build/debug/zeromcp-timeout-test /usr/local/bin/zeromcp-swift-timeout || echo "Swift timeout build failed"; \
     test -f .build/debug/zeromcp-bypass-test && cp .build/debug/zeromcp-bypass-test /usr/local/bin/zeromcp-swift-bypass || echo "Swift bypass build failed"; \
-    test -f .build/debug/zeromcp-credential-test && cp .build/debug/zeromcp-credential-test /usr/local/bin/zeromcp-swift-creds || echo "Swift credential build failed"
+    test -f .build/debug/zeromcp-credential-test && cp .build/debug/zeromcp-credential-test /usr/local/bin/zeromcp-swift-creds || echo "Swift credential build failed"; \
+    test -f .build/debug/zeromcp-resource-test && cp .build/debug/zeromcp-resource-test /usr/local/bin/zeromcp-swift-resource || echo "Swift resource build failed"
 
 # Build Java — library with deps, then compile example
 RUN cd java && mvn package -q -DskipTests && \
     mvn dependency:copy-dependencies -DoutputDirectory=target/deps -q && \
     mkdir -p /tmp/java-out && \
-    javac -cp "target/zeromcp-0.1.0.jar:target/deps/*" \
-      -d /tmp/java-out example/src/main/java/Main.java \
-      example/src/main/java/SandboxTest.java \
-      example/src/main/java/ChaosTest.java \
-      example/src/main/java/TimeoutTest.java \
-      example/src/main/java/BypassTest.java \
-      example/src/main/java/CredentialTest.java 2>&1 || echo "Java example build failed"
+    javac -cp "target/zeromcp-0.1.1.jar:target/deps/*" \
+      -d /tmp/java-out src/main/java/Main.java \
+      src/main/java/SandboxTest.java \
+      src/main/java/ChaosTest.java \
+      src/main/java/TimeoutTest.java \
+      src/main/java/BypassTest.java \
+      src/main/java/CredentialTest.java \
+      src/main/java/ResourceTest.java 2>&1 || echo "Java example build failed"
 
 # Build Kotlin — library + example distribution
 ENV JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
@@ -104,6 +107,7 @@ RUN cd csharp && dotnet publish ChaosTest -c Release -o /tmp/csharp-chaos-out 2>
 RUN cd csharp && dotnet publish TimeoutTest -c Release -o /tmp/csharp-timeout-out 2>&1 | tail -3
 RUN cd csharp && dotnet publish BypassTest -c Release -o /tmp/csharp-bypass-out 2>&1 | tail -3
 RUN cd csharp && dotnet publish CredentialTest -c Release -o /tmp/csharp-creds-out 2>&1 | tail -3
+RUN cd csharp && dotnet publish ResourceTest -c Release -o /tmp/csharp-resource-out 2>&1 | tail -3
 
 # Test fixtures
 RUN echo '{"api_key":"file-secret-123"}' > /tmp/test-creds.json
