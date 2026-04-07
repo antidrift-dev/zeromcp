@@ -232,15 +232,32 @@ const namespaceImplementations = [
   },
 ];
 
-const resourceConfigPath = join(__dirname, 'resource-config.json');
-
 const resourceImplementations = [
   {
     name: 'Node.js',
     command: 'node',
-    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', resourceConfigPath],
+    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'resource-config.json')],
   },
-  // Other languages will be added as they implement v0.2.0
+  {
+    name: 'Python',
+    command: 'python3',
+    args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'resource-config-python.json')],
+    env: { PYTHONPATH: join(root, 'python') },
+  },
+  {
+    name: 'Ruby',
+    command: 'ruby',
+    args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'resource-config-ruby.json')],
+    optional: true,
+  },
+  {
+    name: 'PHP',
+    command: 'php',
+    args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'resource-config-php.json')],
+    optional: true,
+  },
+  // Code-based languages need example binaries with resources/prompts registered
+  // Go, Rust, Java, Kotlin, Swift, C# — added when Docker conformance is set up
 ];
 
 const suites = [

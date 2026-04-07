@@ -1,0 +1,5 @@
+{
+  "tools": ["python/examples/tools"],
+  "resources": ["tests/conformance/test-resources-python"],
+  "prompts": ["tests/conformance/test-prompts-python"]
+}

@@ -1,0 +1,5 @@
+{
+  "tools": ["ruby/tools"],
+  "resources": ["tests/conformance/test-resources-ruby"],
+  "prompts": ["tests/conformance/test-prompts-ruby"]
+}

@@ -1,0 +1,5 @@
+{
+  "tools": ["php/tools"],
+  "resources": ["tests/conformance/test-resources-php"],
+  "prompts": ["tests/conformance/test-prompts-php"]
+}
