@@ -4,7 +4,7 @@ import { ToolScanner } from './scanner.js';
 import { ResourceScanner } from './resource-scanner.js';
 import { PromptScanner } from './prompt-scanner.js';
 import { RemoteManager } from './remote.js';
-import { loadConfig, resolveTransports, resolveAuth, type Config } from './config.js';
+import { loadConfig, resolveTransports, resolveAuth, resolveIcon, type Config } from './config.js';
 import { handleRequest, createState, type JsonRpcRequest, type ServerState } from './dispatch.js';
 
 export async function serve(configOrPath?: Config | string): Promise<void> {
@@ -48,6 +48,9 @@ export async function serve(configOrPath?: Config | string): Promise<void> {
   const promptScanner = new PromptScanner(config);
   await promptScanner.scan();
 
+  // --- Icon ---
+  const icon = await resolveIcon(config.icon);
+
   // --- State ---
   const state = createState({
     tools: allTools,
@@ -57,6 +60,7 @@ export async function serve(configOrPath?: Config | string): Promise<void> {
     executeTimeout: config.execute_timeout ?? 30000,
     pageSize: config.page_size ?? 0,
     version: '0.2.0',
+    icon,
   });
 
   const toolCount = allTools.size;

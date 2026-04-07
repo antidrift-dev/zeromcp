@@ -42,6 +42,59 @@ export interface Config {
   page_size?: number; // 0 = no pagination (default)
   resources?: string | (string | ToolSource)[];
   prompts?: string | (string | ToolSource)[];
+  icon?: string; // URL, file path, or data URI — applied to all tools/resources/prompts
+}
+
+const ICON_MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+};
+
+/**
+ * Resolve an icon config value to a data URI.
+ * Accepts: data URI (passthrough), URL (fetched), file path (read).
+ */
+export async function resolveIcon(icon: string | undefined): Promise<string | undefined> {
+  if (!icon) return undefined;
+
+  // Already a data URI
+  if (icon.startsWith('data:')) return icon;
+
+  // URL — fetch and convert
+  if (icon.startsWith('http://') || icon.startsWith('https://')) {
+    try {
+      const res = await fetch(icon);
+      if (!res.ok) {
+        console.error(`[zeromcp] Warning: failed to fetch icon ${icon}: ${res.status}`);
+        return undefined;
+      }
+      const contentType = res.headers.get('content-type') || 'image/png';
+      const buf = Buffer.from(await res.arrayBuffer());
+      return `data:${contentType};base64,${buf.toString('base64')}`;
+    } catch (err) {
+      console.error(`[zeromcp] Warning: failed to fetch icon ${icon}: ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  // File path — read and convert
+  try {
+    const { readFile: readFileAsync } = await import('node:fs/promises');
+    const { extname } = await import('node:path');
+    const path = icon.replace(/^~/, process.env.HOME || '');
+    const buf = await readFileAsync(path);
+    const ext = extname(path).toLowerCase();
+    const mime = ICON_MIME[ext] || 'image/png';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch (err) {
+    console.error(`[zeromcp] Warning: failed to read icon file ${icon}: ${(err as Error).message}`);
+    return undefined;
+  }
 }
 
 export function resolveToolSources(tools?: string | (string | ToolSource)[]): ToolSource[] {

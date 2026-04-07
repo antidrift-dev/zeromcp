@@ -35,6 +35,7 @@ export interface ServerState {
   logLevel: string;
   roots: Array<{ uri: string; name?: string }>;
   clientCapabilities: Record<string, unknown>;
+  icon?: string;
   notify?: (method: string, params?: unknown) => void;
 }
 
@@ -161,7 +162,9 @@ function handleToolsList(id: number | string, params: Record<string, unknown> | 
   const cursor = (params as { cursor?: string })?.cursor;
   const list = [];
   for (const [name, tool] of state.tools) {
-    list.push({ name, description: tool.description, inputSchema: tool.cachedSchema });
+    const entry: Record<string, unknown> = { name, description: tool.description, inputSchema: tool.cachedSchema };
+    if (state.icon) entry.icons = [{ uri: state.icon }];
+    list.push(entry);
   }
   const { items, nextCursor } = paginate(list, cursor, state.pageSize);
   const result: Record<string, unknown> = { tools: items };
@@ -201,7 +204,9 @@ function handleResourcesList(id: number | string, params: Record<string, unknown
   const cursor = (params as { cursor?: string })?.cursor;
   const list = [];
   for (const [, res] of state.resources) {
-    list.push({ uri: res.uri, name: res.name, description: res.description, mimeType: res.mimeType });
+    const entry: Record<string, unknown> = { uri: res.uri, name: res.name, description: res.description, mimeType: res.mimeType };
+    if (state.icon) entry.icons = [{ uri: state.icon }];
+    list.push(entry);
   }
   const { items, nextCursor } = paginate(list, cursor, state.pageSize);
   const result: Record<string, unknown> = { resources: items };
@@ -250,7 +255,9 @@ function handleResourcesTemplatesList(id: number | string, params: Record<string
   const cursor = (params as { cursor?: string })?.cursor;
   const list = [];
   for (const [, tmpl] of state.templates) {
-    list.push({ uriTemplate: tmpl.uriTemplate, name: tmpl.name, description: tmpl.description, mimeType: tmpl.mimeType });
+    const entry: Record<string, unknown> = { uriTemplate: tmpl.uriTemplate, name: tmpl.name, description: tmpl.description, mimeType: tmpl.mimeType };
+    if (state.icon) entry.icons = [{ uri: state.icon }];
+    list.push(entry);
   }
   const { items, nextCursor } = paginate(list, cursor, state.pageSize);
   const result: Record<string, unknown> = { resourceTemplates: items };
@@ -267,6 +274,7 @@ function handlePromptsList(id: number | string, params: Record<string, unknown> 
     const entry: Record<string, unknown> = { name: prompt.name };
     if (prompt.description) entry.description = prompt.description;
     if (prompt.arguments) entry.arguments = prompt.arguments;
+    if (state.icon) entry.icons = [{ uri: state.icon }];
     list.push(entry);
   }
   const { items, nextCursor } = paginate(list, cursor, state.pageSize);
