@@ -796,3 +796,658 @@ fn simple_match(
 
     Some(params)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use crate::types::{Prompt, PromptArgument, PromptContent, PromptMessage, Resource, ResourceTemplate};
+
+    // -----------------------------------------------------------------------
+    // Pagination: encode_cursor / decode_cursor
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn encode_decode_cursor_roundtrip() {
+        for offset in [0, 1, 5, 42, 100, 9999] {
+            let encoded = encode_cursor(offset);
+            let decoded = decode_cursor(&encoded);
+            assert_eq!(decoded, Some(offset), "roundtrip failed for offset {offset}");
+        }
+    }
+
+    #[test]
+    fn decode_cursor_invalid_base64_returns_none() {
+        assert_eq!(decode_cursor("!!!not-base64!!!"), None);
+    }
+
+    #[test]
+    fn decode_cursor_valid_base64_non_numeric_returns_none() {
+        // base64("hello") = "aGVsbG8="
+        assert_eq!(decode_cursor("aGVsbG8="), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // Pagination: paginate()
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn paginate_disabled_returns_all() {
+        let items: Vec<Value> = (0..5).map(|i| json!(i)).collect();
+        let (page, next) = paginate(&items, None, 0);
+        assert_eq!(page.len(), 5);
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn paginate_first_page() {
+        let items: Vec<Value> = (0..5).map(|i| json!(i)).collect();
+        let (page, next) = paginate(&items, None, 2);
+        assert_eq!(page, vec![json!(0), json!(1)]);
+        assert!(next.is_some());
+    }
+
+    #[test]
+    fn paginate_second_page_via_cursor() {
+        let items: Vec<Value> = (0..5).map(|i| json!(i)).collect();
+        let (_, next) = paginate(&items, None, 2);
+        let cursor = next.unwrap();
+        let (page2, next2) = paginate(&items, Some(&cursor), 2);
+        assert_eq!(page2, vec![json!(2), json!(3)]);
+        assert!(next2.is_some());
+    }
+
+    #[test]
+    fn paginate_last_page_no_next_cursor() {
+        let items: Vec<Value> = (0..4).map(|i| json!(i)).collect();
+        let (_, c1) = paginate(&items, None, 2);
+        let (page2, next2) = paginate(&items, Some(&c1.unwrap()), 2);
+        assert_eq!(page2, vec![json!(2), json!(3)]);
+        assert!(next2.is_none());
+    }
+
+    #[test]
+    fn paginate_cursor_beyond_end() {
+        let items: Vec<Value> = (0..2).map(|i| json!(i)).collect();
+        let cursor = encode_cursor(100);
+        let (page, next) = paginate(&items, Some(&cursor), 2);
+        assert!(page.is_empty());
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn paginate_page_size_larger_than_items() {
+        let items: Vec<Value> = (0..3).map(|i| json!(i)).collect();
+        let (page, next) = paginate(&items, None, 10);
+        assert_eq!(page.len(), 3);
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn paginate_empty_items() {
+        let items: Vec<Value> = vec![];
+        let (page, next) = paginate(&items, None, 2);
+        assert!(page.is_empty());
+        assert!(next.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Template URI matching
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn match_template_single_param() {
+        let result = match_template("file://docs/{id}", "file://docs/abc");
+        let params = result.unwrap();
+        assert_eq!(params.get("id").unwrap(), "abc");
+    }
+
+    #[test]
+    fn match_template_multiple_params() {
+        let result = match_template("file://users/{user}/posts/{post}", "file://users/alice/posts/42");
+        let params = result.unwrap();
+        assert_eq!(params.get("user").unwrap(), "alice");
+        assert_eq!(params.get("post").unwrap(), "42");
+    }
+
+    #[test]
+    fn match_template_no_match_wrong_prefix() {
+        let result = match_template("file://docs/{id}", "http://docs/abc");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_template_no_match_extra_suffix() {
+        let result = match_template("file://docs/{id}/info", "file://docs/abc/info/extra");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_template_no_params() {
+        let result = match_template("file://static", "file://static");
+        let params = result.unwrap();
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn match_template_no_params_no_match() {
+        let result = match_template("file://static", "file://other");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_template_param_at_end() {
+        let result = match_template("file://items/{name}", "file://items/my-item");
+        let params = result.unwrap();
+        assert_eq!(params.get("name").unwrap(), "my-item");
+    }
+
+    // -----------------------------------------------------------------------
+    // Resource registration and list
+    // -----------------------------------------------------------------------
+
+    fn make_resource_server() -> Server {
+        let mut server = Server::new();
+        server.resource(Resource {
+            uri: "file://readme".to_string(),
+            name: "README".to_string(),
+            description: "The readme file".to_string(),
+            mime_type: "text/plain".to_string(),
+            read: Box::new(|| Box::pin(async { Ok("# Hello".to_string()) })),
+        });
+        server.resource(Resource {
+            uri: "file://config".to_string(),
+            name: "Config".to_string(),
+            description: "The config file".to_string(),
+            mime_type: "application/json".to_string(),
+            read: Box::new(|| Box::pin(async { Ok(r#"{"key":"value"}"#.to_string()) })),
+        });
+        server
+    }
+
+    #[tokio::test]
+    async fn resources_list_returns_registered() {
+        let server = make_resource_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "resources/list"
+        })).await.unwrap();
+        let resources = resp["result"]["resources"].as_array().unwrap();
+        assert_eq!(resources.len(), 2);
+        // BTreeMap ordering: "file://config" < "file://readme"
+        assert_eq!(resources[0]["uri"], "file://config");
+        assert_eq!(resources[0]["name"], "Config");
+        assert_eq!(resources[1]["uri"], "file://readme");
+        assert_eq!(resources[1]["name"], "README");
+    }
+
+    #[tokio::test]
+    async fn resources_list_empty_server() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "resources/list"
+        })).await.unwrap();
+        let resources = resp["result"]["resources"].as_array().unwrap();
+        assert!(resources.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Prompt registration and list
+    // -----------------------------------------------------------------------
+
+    fn make_prompt_server() -> Server {
+        let mut server = Server::new();
+        server.prompt(Prompt {
+            name: "greet".to_string(),
+            description: Some("Greeting prompt".to_string()),
+            arguments: Some(vec![
+                PromptArgument {
+                    name: "name".to_string(),
+                    description: Some("Who to greet".to_string()),
+                    required: Some(true),
+                },
+            ]),
+            render: Box::new(|args: Value| {
+                Box::pin(async move {
+                    let name = args["name"].as_str().unwrap_or("world");
+                    Ok(vec![PromptMessage {
+                        role: "user".to_string(),
+                        content: PromptContent::Text {
+                            text: format!("Hello, {name}!"),
+                        },
+                    }])
+                })
+            }),
+        });
+        server
+    }
+
+    #[tokio::test]
+    async fn prompts_list_returns_registered() {
+        let server = make_prompt_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "prompts/list"
+        })).await.unwrap();
+        let prompts = resp["result"]["prompts"].as_array().unwrap();
+        assert_eq!(prompts.len(), 1);
+        assert_eq!(prompts[0]["name"], "greet");
+        assert_eq!(prompts[0]["description"], "Greeting prompt");
+        let args = prompts[0]["arguments"].as_array().unwrap();
+        assert_eq!(args[0]["name"], "name");
+        assert_eq!(args[0]["required"], true);
+    }
+
+    #[tokio::test]
+    async fn prompts_list_empty_server() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "prompts/list"
+        })).await.unwrap();
+        let prompts = resp["result"]["prompts"].as_array().unwrap();
+        assert!(prompts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Server dispatch: resources/read
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn resources_read_static_resource() {
+        let server = make_resource_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "resources/read",
+            "params": { "uri": "file://readme" }
+        })).await.unwrap();
+        let contents = resp["result"]["contents"].as_array().unwrap();
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0]["text"], "# Hello");
+        assert_eq!(contents[0]["mimeType"], "text/plain");
+    }
+
+    #[tokio::test]
+    async fn resources_read_not_found() {
+        let server = make_resource_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "resources/read",
+            "params": { "uri": "file://nonexistent" }
+        })).await.unwrap();
+        assert!(resp["error"].is_object());
+        assert_eq!(resp["error"]["code"], -32002);
+    }
+
+    #[tokio::test]
+    async fn resources_read_template() {
+        let mut server = Server::new();
+        server.resource_template(ResourceTemplate {
+            uri_template: "file://docs/{id}".to_string(),
+            name: "Doc".to_string(),
+            description: "A document".to_string(),
+            mime_type: "text/plain".to_string(),
+            read: Box::new(|params| {
+                Box::pin(async move {
+                    let id = params.get("id").cloned().unwrap_or_default();
+                    Ok(format!("Document: {id}"))
+                })
+            }),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "resources/read",
+            "params": { "uri": "file://docs/my-doc" }
+        })).await.unwrap();
+        let contents = resp["result"]["contents"].as_array().unwrap();
+        assert_eq!(contents[0]["text"], "Document: my-doc");
+    }
+
+    #[tokio::test]
+    async fn resources_read_error_from_handler() {
+        let mut server = Server::new();
+        server.resource(Resource {
+            uri: "file://broken".to_string(),
+            name: "Broken".to_string(),
+            description: "Always fails".to_string(),
+            mime_type: "text/plain".to_string(),
+            read: Box::new(|| Box::pin(async { Err("disk error".to_string()) })),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "resources/read",
+            "params": { "uri": "file://broken" }
+        })).await.unwrap();
+        assert!(resp["error"]["message"].as_str().unwrap().contains("disk error"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Server dispatch: prompts/get
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prompts_get_renders_message() {
+        let server = make_prompt_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "prompts/get",
+            "params": { "name": "greet", "arguments": { "name": "Alice" } }
+        })).await.unwrap();
+        let messages = resp["result"]["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[0]["content"]["text"], "Hello, Alice!");
+    }
+
+    #[tokio::test]
+    async fn prompts_get_not_found() {
+        let server = make_prompt_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "prompts/get",
+            "params": { "name": "nonexistent" }
+        })).await.unwrap();
+        assert!(resp["error"].is_object());
+        assert_eq!(resp["error"]["code"], -32002);
+    }
+
+    #[tokio::test]
+    async fn prompts_get_render_error() {
+        let mut server = Server::new();
+        server.prompt(Prompt {
+            name: "bad".to_string(),
+            description: None,
+            arguments: None,
+            render: Box::new(|_| Box::pin(async { Err("render failed".to_string()) })),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "prompts/get",
+            "params": { "name": "bad" }
+        })).await.unwrap();
+        assert!(resp["error"]["message"].as_str().unwrap().contains("render failed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Server dispatch: logging/setLevel
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn logging_set_level_returns_ok() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "logging/setLevel",
+            "params": { "level": "debug" }
+        })).await.unwrap();
+        assert_eq!(resp["result"], json!({}));
+        assert!(resp.get("error").is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Server dispatch: misc
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn ping_returns_empty_result() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "ping"
+        })).await.unwrap();
+        assert_eq!(resp["result"], json!({}));
+    }
+
+    #[tokio::test]
+    async fn unknown_method_returns_error() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "foo/bar"
+        })).await.unwrap();
+        assert_eq!(resp["error"]["code"], -32601);
+    }
+
+    #[tokio::test]
+    async fn notification_returns_none() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "method": "notifications/initialized"
+        })).await;
+        assert!(resp.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Icon support
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn icon_appears_in_initialize() {
+        let mut server = Server::new();
+        server.icon = Some("https://example.com/icon.png".to_string());
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize"
+        })).await.unwrap();
+        assert_eq!(
+            resp["result"]["serverInfo"]["icon"],
+            "https://example.com/icon.png"
+        );
+    }
+
+    #[tokio::test]
+    async fn icon_absent_when_not_set() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize"
+        })).await.unwrap();
+        assert!(resp["result"]["serverInfo"]["icon"].is_null());
+    }
+
+    #[tokio::test]
+    async fn icon_appears_in_tools_list() {
+        let mut server = Server::new();
+        server.icon = Some("https://example.com/icon.png".to_string());
+        server.add_tool("demo", "A demo tool", Input::new(), |_, _| {
+            Box::pin(async { Ok(json!("ok")) })
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/list"
+        })).await.unwrap();
+        let tools = resp["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools[0]["icons"][0]["uri"], "https://example.com/icon.png");
+    }
+
+    #[tokio::test]
+    async fn icon_appears_in_resources_list() {
+        let mut server = Server::new();
+        server.icon = Some("https://example.com/icon.png".to_string());
+        server.resource(Resource {
+            uri: "file://test".to_string(),
+            name: "Test".to_string(),
+            description: "test".to_string(),
+            mime_type: "text/plain".to_string(),
+            read: Box::new(|| Box::pin(async { Ok("data".to_string()) })),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "resources/list"
+        })).await.unwrap();
+        let resources = resp["result"]["resources"].as_array().unwrap();
+        assert_eq!(resources[0]["icons"][0]["uri"], "https://example.com/icon.png");
+    }
+
+    #[tokio::test]
+    async fn icon_appears_in_prompts_list() {
+        let mut server = Server::new();
+        server.icon = Some("https://example.com/icon.png".to_string());
+        server.prompt(Prompt {
+            name: "test".to_string(),
+            description: None,
+            arguments: None,
+            render: Box::new(|_| Box::pin(async { Ok(vec![]) })),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "prompts/list"
+        })).await.unwrap();
+        let prompts = resp["result"]["prompts"].as_array().unwrap();
+        assert_eq!(prompts[0]["icons"][0]["uri"], "https://example.com/icon.png");
+    }
+
+    #[tokio::test]
+    async fn icon_appears_in_templates_list() {
+        let mut server = Server::new();
+        server.icon = Some("https://example.com/icon.png".to_string());
+        server.resource_template(ResourceTemplate {
+            uri_template: "file://docs/{id}".to_string(),
+            name: "Doc".to_string(),
+            description: "A doc".to_string(),
+            mime_type: "text/plain".to_string(),
+            read: Box::new(|_| Box::pin(async { Ok("data".to_string()) })),
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "resources/templates/list"
+        })).await.unwrap();
+        let templates = resp["result"]["resourceTemplates"].as_array().unwrap();
+        assert_eq!(templates[0]["icons"][0]["uri"], "https://example.com/icon.png");
+    }
+
+    // -----------------------------------------------------------------------
+    // Initialize capabilities reflect registrations
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn initialize_capabilities_include_resources() {
+        let server = make_resource_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize"
+        })).await.unwrap();
+        assert!(resp["result"]["capabilities"]["resources"].is_object());
+    }
+
+    #[tokio::test]
+    async fn initialize_capabilities_include_prompts() {
+        let server = make_prompt_server();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize"
+        })).await.unwrap();
+        assert!(resp["result"]["capabilities"]["prompts"].is_object());
+    }
+
+    #[tokio::test]
+    async fn initialize_empty_server_has_tools_and_logging_only() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize"
+        })).await.unwrap();
+        let caps = &resp["result"]["capabilities"];
+        assert!(caps["tools"].is_object());
+        assert!(caps["logging"].is_object());
+        assert!(caps["resources"].is_null());
+        assert!(caps["prompts"].is_null());
+    }
+
+    // -----------------------------------------------------------------------
+    // Pagination via dispatch
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn tools_list_pagination() {
+        let mut server = Server::new();
+        server.set_page_size(1);
+        server.add_tool("alpha", "first", Input::new(), |_, _| {
+            Box::pin(async { Ok(json!("a")) })
+        });
+        server.add_tool("beta", "second", Input::new(), |_, _| {
+            Box::pin(async { Ok(json!("b")) })
+        });
+
+        // First page
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/list"
+        })).await.unwrap();
+        let tools = resp["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1);
+        let cursor = resp["result"]["nextCursor"].as_str().unwrap();
+
+        // Second page
+        let resp2 = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/list",
+            "params": { "cursor": cursor }
+        })).await.unwrap();
+        let tools2 = resp2["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools2.len(), 1);
+        assert!(resp2["result"]["nextCursor"].is_null());
+    }
+
+    // -----------------------------------------------------------------------
+    // tools/call dispatch
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn tools_call_success() {
+        let mut server = Server::new();
+        server.add_tool("echo", "Echo input", Input::new().required("msg", "string"), |args, _| {
+            Box::pin(async move {
+                Ok(Value::String(args["msg"].as_str().unwrap_or("").to_string()))
+            })
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "tools/call",
+            "params": { "name": "echo", "arguments": { "msg": "hi" } }
+        })).await.unwrap();
+        let content = &resp["result"]["content"][0];
+        assert_eq!(content["text"], "hi");
+        assert!(resp["result"]["isError"].is_null());
+    }
+
+    #[tokio::test]
+    async fn tools_call_unknown_tool() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "tools/call",
+            "params": { "name": "nope", "arguments": {} }
+        })).await.unwrap();
+        assert_eq!(resp["result"]["isError"], true);
+        assert!(resp["result"]["content"][0]["text"].as_str().unwrap().contains("Unknown tool"));
+    }
+
+    #[tokio::test]
+    async fn tools_call_validation_error() {
+        let mut server = Server::new();
+        server.add_tool("needs_name", "Needs a name", Input::new().required("name", "string"), |_, _| {
+            Box::pin(async { Ok(json!("ok")) })
+        });
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "tools/call",
+            "params": { "name": "needs_name", "arguments": {} }
+        })).await.unwrap();
+        assert_eq!(resp["result"]["isError"], true);
+        assert!(resp["result"]["content"][0]["text"].as_str().unwrap().contains("Validation"));
+    }
+
+    // -----------------------------------------------------------------------
+    // resources/subscribe
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn resources_subscribe_returns_ok() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "resources/subscribe",
+            "params": { "uri": "file://something" }
+        })).await.unwrap();
+        assert_eq!(resp["result"], json!({}));
+    }
+
+    // -----------------------------------------------------------------------
+    // completion/complete
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn completion_complete_returns_empty() {
+        let server = Server::new();
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "completion/complete"
+        })).await.unwrap();
+        let values = resp["result"]["completion"]["values"].as_array().unwrap();
+        assert!(values.is_empty());
+    }
+}

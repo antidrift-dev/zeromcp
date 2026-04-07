@@ -270,4 +270,77 @@ mod tests {
     fn unknown_type_panics() {
         Input::new().required("x", "bigint").to_json_schema();
     }
+
+    #[test]
+    fn validate_null_counts_as_missing() {
+        let input = Input::new().required("name", "string");
+        let schema = input.to_json_schema();
+        let errors = validate(&json!({"name": null}), &schema);
+        // null triggers both "missing required" and a type mismatch (null != string)
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|e| e.contains("Missing required field")));
+        assert!(errors.iter().any(|e| e.contains("expected string, got null")));
+    }
+
+    #[test]
+    fn validate_non_object_input() {
+        let input = Input::new().required("name", "string");
+        let schema = input.to_json_schema();
+        let errors = validate(&json!("not an object"), &schema);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Input must be an object"));
+    }
+
+    #[test]
+    fn validate_extra_fields_ignored() {
+        let input = Input::new().required("name", "string");
+        let schema = input.to_json_schema();
+        let errors = validate(&json!({"name": "Alice", "extra": 42}), &schema);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn validate_boolean_type_check() {
+        let input = Input::new().required("flag", "boolean");
+        let schema = input.to_json_schema();
+        let errors = validate(&json!({"flag": "true"}), &schema);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("expected boolean"));
+    }
+
+    #[test]
+    fn validate_object_and_array_types() {
+        let input = Input::new()
+            .required("data", "object")
+            .required("items", "array");
+        let schema = input.to_json_schema();
+        // correct
+        let errors = validate(&json!({"data": {}, "items": []}), &schema);
+        assert!(errors.is_empty());
+        // swapped
+        let errors = validate(&json!({"data": [], "items": {}}), &schema);
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn optional_desc_preserved() {
+        let input = Input::new().optional_desc("debug", "boolean", "Enable debug mode");
+        let schema = input.to_json_schema();
+        assert!(schema.required.is_empty());
+        assert_eq!(
+            schema.properties["debug"].description.as_deref(),
+            Some("Enable debug mode")
+        );
+    }
+
+    #[test]
+    fn multiple_missing_required_fields() {
+        let input = Input::new()
+            .required("a", "string")
+            .required("b", "number")
+            .required("c", "boolean");
+        let schema = input.to_json_schema();
+        let errors = validate(&json!({}), &schema);
+        assert_eq!(errors.len(), 3);
+    }
 }

@@ -15,7 +15,7 @@ class TestScanner < Minitest::Test
 
     assert tools.key?('hello'), "Expected 'hello' tool to be loaded"
     tool = tools['hello']
-    assert_equal 'Say hello', tool.description
+    assert_equal 'Say hello to someone', tool.description
     assert_equal 'Hello, World!', tool.call({ 'name' => 'World' }, nil)
   end
 end
