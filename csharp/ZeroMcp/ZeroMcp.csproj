@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>Antidrift.ZeroMcp</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>Antidrift</Authors>
     <Description>Zero-config MCP runtime for .NET</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

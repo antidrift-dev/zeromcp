@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.1.0"
+const version = "0.1.1"
 const protocolVersion = "2024-11-05"
 
 // Tool defines an MCP tool with its schema, permissions, and execute function.
