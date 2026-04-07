@@ -1,0 +1,153 @@
+{
+  "tests": [
+    {
+      "name": "initialize_with_resources",
+      "request": {
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": { "name": "test", "version": "1.0" } }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 1,
+        "result": {
+          "capabilities": { "resources": {}, "prompts": {}, "tools": {} }
+        }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "initialized_notification",
+      "request": { "jsonrpc": "2.0", "method": "notifications/initialized" },
+      "expect": null,
+      "match": "silent"
+    },
+    {
+      "name": "resources_list",
+      "request": { "jsonrpc": "2.0", "id": 2, "method": "resources/list" },
+      "expect": {
+        "jsonrpc": "2.0", "id": 2,
+        "result": { "resources": [] }
+      },
+      "match": "partial",
+      "note": "Must return a resources array (length >= 1)"
+    },
+    {
+      "name": "resources_list_has_items",
+      "request": { "jsonrpc": "2.0", "id": 3, "method": "resources/list" },
+      "expect": {
+        "jsonrpc": "2.0", "id": 3,
+        "result": {}
+      },
+      "match": "custom",
+      "validate": "result.resources.length >= 2"
+    },
+    {
+      "name": "resources_read_static",
+      "request": {
+        "jsonrpc": "2.0", "id": 4, "method": "resources/read",
+        "params": { "uri": "resource:///data.json" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 4,
+        "result": { "contents": [] }
+      },
+      "match": "custom",
+      "validate": "result.contents.length === 1 && result.contents[0].text.includes('\"key\"')"
+    },
+    {
+      "name": "resources_read_dynamic",
+      "request": {
+        "jsonrpc": "2.0", "id": 5, "method": "resources/read",
+        "params": { "uri": "resource:///dynamic" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 5,
+        "result": { "contents": [] }
+      },
+      "match": "custom",
+      "validate": "result.contents.length === 1 && result.contents[0].text.includes('dynamic')"
+    },
+    {
+      "name": "resources_read_not_found",
+      "request": {
+        "jsonrpc": "2.0", "id": 6, "method": "resources/read",
+        "params": { "uri": "resource:///nonexistent" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 6,
+        "error": { "code": -32002 }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "resources_subscribe",
+      "request": {
+        "jsonrpc": "2.0", "id": 7, "method": "resources/subscribe",
+        "params": { "uri": "resource:///data.json" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 7,
+        "result": {}
+      },
+      "match": "partial"
+    },
+    {
+      "name": "prompts_list",
+      "request": { "jsonrpc": "2.0", "id": 8, "method": "prompts/list" },
+      "expect": {
+        "jsonrpc": "2.0", "id": 8,
+        "result": { "prompts": [] }
+      },
+      "match": "custom",
+      "validate": "result.prompts.length >= 1 && result.prompts[0].name === 'greet'"
+    },
+    {
+      "name": "prompts_get",
+      "request": {
+        "jsonrpc": "2.0", "id": 9, "method": "prompts/get",
+        "params": { "name": "greet", "arguments": { "name": "Alice", "tone": "formal" } }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 9,
+        "result": { "messages": [] }
+      },
+      "match": "custom",
+      "validate": "result.messages.length >= 1 && result.messages[0].role === 'user' && result.messages[0].content.text.includes('Alice')"
+    },
+    {
+      "name": "prompts_get_not_found",
+      "request": {
+        "jsonrpc": "2.0", "id": 10, "method": "prompts/get",
+        "params": { "name": "nonexistent" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 10,
+        "error": { "code": -32002 }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "logging_setLevel",
+      "request": {
+        "jsonrpc": "2.0", "id": 11, "method": "logging/setLevel",
+        "params": { "level": "debug" }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 11,
+        "result": {}
+      },
+      "match": "partial"
+    },
+    {
+      "name": "tools_still_work",
+      "request": {
+        "jsonrpc": "2.0", "id": 12, "method": "tools/call",
+        "params": { "name": "hello", "arguments": { "name": "conformance" } }
+      },
+      "expect": {
+        "jsonrpc": "2.0", "id": 12,
+        "result": { "content": [{ "type": "text", "text": "Hello, conformance!" }] }
+      },
+      "match": "partial"
+    }
+  ]
+}

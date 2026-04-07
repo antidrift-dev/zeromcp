@@ -1,0 +1,5 @@
+{
+  "tools": ["nodejs/examples/tools"],
+  "resources": ["tests/conformance/test-resources"],
+  "prompts": ["tests/conformance/test-prompts"]
+}

@@ -232,11 +232,27 @@ const namespaceImplementations = [
   },
 ];
 
+const resourceConfigPath = join(__dirname, 'resource-config.json');
+
+const resourceImplementations = [
+  {
+    name: 'Node.js',
+    command: 'node',
+    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', resourceConfigPath],
+  },
+  // Other languages will be added as they implement v0.2.0
+];
+
 const suites = [
   {
     name: 'Protocol Conformance',
     fixtures: 'fixtures.json',
     implementations: protocolImplementations,
+  },
+  {
+    name: 'Resources & Prompts',
+    fixtures: 'resource-fixtures.json',
+    implementations: resourceImplementations,
   },
   {
     name: 'Sandbox Enforcement',
@@ -664,6 +680,15 @@ async function testImplementation(impl, fixtures) {
             }
           }
         }
+      } else if (test.match === 'custom') {
+        const result = response?.result;
+        const error = response?.error;
+        try {
+          const ok = eval(test.validate);
+          if (!ok) errors = [`Custom validation failed: ${test.validate}`];
+        } catch (e) {
+          errors = [`Custom validation error: ${e.message} (expr: ${test.validate})`];
+        }
       }
 
       if (errors.length === 0) passed++;
@@ -687,8 +712,9 @@ async function main() {
 
   let totalPassed = 0, totalFailed = 0, totalSkipped = 0;
 
-  // Filter suites by --suite flag
+  // Filter by --suite and --language flags
   const suiteFilter = process.argv.find((a, i) => process.argv[i - 1] === '--suite');
+  const langFilter = process.argv.find((a, i) => process.argv[i - 1] === '--language');
 
   for (const suite of suites) {
     if (suiteFilter && suite.name.toLowerCase() !== suiteFilter.toLowerCase()) continue;
@@ -706,6 +732,7 @@ async function main() {
     if (suite.setup) await suite.setup();
 
     for (const impl of suite.implementations) {
+      if (langFilter && impl.name.toLowerCase() !== langFilter.toLowerCase()) continue;
       const result = await testImplementation(impl, fixtures);
 
       if (result.skipped) {
