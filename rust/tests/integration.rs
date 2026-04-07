@@ -16,6 +16,7 @@ fn make_server() -> Server {
                     Ok(Value::String(format!("Hello, {name}!")))
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -34,6 +35,7 @@ fn make_server() -> Server {
                     Ok(json!(a + b))
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -46,6 +48,7 @@ fn make_server() -> Server {
             execute: Box::new(|_args: Value, _ctx: Ctx| {
                 Box::pin(async move { Err("something went wrong".to_string()) })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -146,6 +149,7 @@ async fn tool_execute_success() {
                 ))
             })
         }),
+        cached_schema: Default::default(),
     };
 
     let ctx = Ctx::default();
@@ -163,6 +167,7 @@ async fn tool_execute_failure() {
         execute: Box::new(|_args: Value, _ctx: Ctx| {
             Box::pin(async move { Err("boom".to_string()) })
         }),
+        cached_schema: Default::default(),
     };
 
     let ctx = Ctx::default();

@@ -30,6 +30,7 @@ async fn main() {
                     }
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -50,6 +51,7 @@ async fn main() {
                     }
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -70,6 +72,7 @@ async fn main() {
                     }
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -90,6 +93,7 @@ async fn main() {
                     }
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -110,6 +114,7 @@ async fn main() {
                     }
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 

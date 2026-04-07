@@ -23,6 +23,7 @@ import kotlinx.serialization.json.*
 class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
 
     private val tools = mutableMapOf<String, ToolDefinition>()
+    private val schemas = mutableMapOf<String, JsonObject>()
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
@@ -34,6 +35,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
         val tool = builder.build()
         validatePermissions(name, tool.permissions)
         tools[name] = tool
+        schemas[name] = toJsonSchema(tool.input)
     }
 
     /**
@@ -42,6 +44,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
     fun register(tool: ToolDefinition) {
         validatePermissions(tool.name, tool.permissions)
         tools[tool.name] = tool
+        schemas[tool.name] = toJsonSchema(tool.input)
     }
 
     /**
@@ -108,7 +111,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
                         addJsonObject {
                             put("name", name)
                             put("description", tool.description)
-                            put("inputSchema", toJsonSchema(tool.input))
+                            put("inputSchema", schemas[name]!!)
                         }
                     }
                 }
@@ -135,7 +138,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
     private suspend fun callTool(name: String, args: Map<String, Any?>): JsonObject {
         val tool = tools[name] ?: return buildToolResult("Unknown tool: $name", isError = true)
 
-        val schema = toJsonSchema(tool.input)
+        val schema = schemas[name]!!
         val errors = validate(args, schema)
         if (errors.isNotEmpty()) {
             return buildToolResult("Validation errors:\n${errors.joinToString("\n")}", isError = true)

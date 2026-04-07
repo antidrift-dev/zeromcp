@@ -17,6 +17,7 @@ async fn main() {
                     Ok(Value::String(format!("Hello, {name}!")))
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 
@@ -35,6 +36,7 @@ async fn main() {
                     Ok(serde_json::json!({"sum": a + b}))
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 

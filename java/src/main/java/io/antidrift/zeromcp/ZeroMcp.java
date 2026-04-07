@@ -35,11 +35,12 @@ public class ZeroMcp {
     }
 
     /**
-     * Register a tool.
+     * Register a tool. Computes and caches the JSON schema at registration time.
      */
     public void tool(String name, Tool tool) {
         Sandbox.validatePermissions(name, tool.permissions());
-        tools.put(name, new NamedTool(name, tool));
+        var schema = Schema.toJsonSchema(tool.inputs());
+        tools.put(name, new NamedTool(name, tool, schema));
     }
 
     /**
@@ -128,7 +129,7 @@ public class ZeroMcp {
             var obj = new JsonObject();
             obj.addProperty("name", entry.getKey());
             obj.addProperty("description", entry.getValue().tool().description());
-            obj.add("inputSchema", Schema.toJsonSchema(entry.getValue().tool().inputs()));
+            obj.add("inputSchema", entry.getValue().inputSchema());
             toolsArray.add(obj);
         }
 
@@ -158,8 +159,7 @@ public class ZeroMcp {
         var tool = namedTool.tool();
         var argsMap = jsonObjectToMap(argsJson);
 
-        var schema = Schema.toJsonSchema(tool.inputs());
-        var errors = Schema.validate(argsMap, schema);
+        var errors = Schema.validate(argsMap, namedTool.inputSchema());
         if (!errors.isEmpty()) {
             return buildToolResult("Validation errors:\n" + String.join("\n", errors), true);
         }
@@ -258,5 +258,5 @@ public class ZeroMcp {
         return element.toString();
     }
 
-    private record NamedTool(String name, Tool tool) {}
+    private record NamedTool(String name, Tool tool, JsonObject inputSchema) {}
 }

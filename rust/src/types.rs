@@ -58,4 +58,6 @@ pub struct Tool {
     pub input: crate::schema::Input,
     pub permissions: Permissions,
     pub execute: ExecuteFn,
+    /// Pre-computed JSON schema, populated at registration time.
+    pub cached_schema: crate::schema::JsonSchema,
 }

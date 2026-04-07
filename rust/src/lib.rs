@@ -18,6 +18,7 @@
 //!             let name = args["name"].as_str().unwrap_or("world");
 //!             Ok(Value::String(format!("Hello, {name}!")))
 //!         })),
+//!         cached_schema: Default::default(),
 //!     });
 //!
 //!     server.serve().await;

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import resolve_credentials, resolve_tool_sources
 from .sandbox import create_sandbox, validate_permissions
+from .schema import to_json_schema
 
 
 class ToolScanner:
@@ -112,9 +113,11 @@ class ToolScanner:
         async def wrapped_execute(args: dict, _ctx=ctx):
             return await raw_execute(args, _ctx)
 
+        input_schema = tool_meta.get("input", {})
         self.tools[name] = {
             "description": tool_meta.get("description", ""),
-            "input": tool_meta.get("input", {}),
+            "input": input_schema,
+            "_cached_schema": to_json_schema(input_schema),
             "permissions": tool_meta.get("permissions"),
             "execute": wrapped_execute,
         }

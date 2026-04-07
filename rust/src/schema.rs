@@ -21,7 +21,7 @@ struct Field {
 }
 
 /// The JSON Schema representation we emit for MCP.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct JsonSchema {
     #[serde(rename = "type")]
     pub schema_type: String,

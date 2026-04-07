@@ -1,7 +1,7 @@
 import type { RemoteServer } from './config.js';
 import { resolveAuth } from './config.js';
 import type { ToolDefinition } from './scanner.js';
-import type { InputSchema } from './schema.js';
+import { type InputSchema, toJsonSchema } from './schema.js';
 
 interface RemoteTool {
   name: string;
@@ -61,9 +61,11 @@ export class RemoteManager {
     const remoteTools = listRes?.result?.tools as RemoteTool[] || [];
 
     for (const rt of remoteTools) {
+      const input = this.schemaToInput(rt.inputSchema);
       tools.set(rt.name, {
         description: rt.description,
-        input: this.schemaToInput(rt.inputSchema),
+        input,
+        cachedSchema: toJsonSchema(input),
         execute: async (args: Record<string, unknown>) => {
           const callRes = await this.httpRpc(server.url, {
             jsonrpc: '2.0', id: Date.now(),

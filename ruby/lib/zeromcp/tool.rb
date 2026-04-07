@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative 'schema'
+
 module ZeroMcp
   class Tool
-    attr_reader :name, :description, :input, :permissions, :execute_block
+    attr_reader :name, :description, :input, :permissions, :execute_block, :cached_schema
 
     def initialize(name:, description: '', input: {}, permissions: {}, &block)
       @name = name
@@ -10,6 +12,7 @@ module ZeroMcp
       @input = input
       @permissions = permissions
       @execute_block = block
+      @cached_schema = Schema.to_json_schema(@input)
     end
 
     def call(args, ctx = {})

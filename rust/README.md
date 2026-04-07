@@ -24,6 +24,7 @@ async fn main() {
                     Ok(Value::String(format!("Hello, {name}!")))
                 })
             }),
+            cached_schema: Default::default(),
         },
     );
 

@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { ToolScanner, type ToolDefinition } from './scanner.js';
 import { RemoteManager } from './remote.js';
 import { loadConfig, resolveTransports, resolveAuth, type Config, type TransportConfig } from './config.js';
-import { toJsonSchema, validate } from './schema.js';
+import { validate } from './schema.js';
 
 interface JsonRpcRequest {
   jsonrpc: string;
@@ -249,7 +249,7 @@ function buildToolList(tools: Map<string, ToolDefinition>) {
     list.push({
       name,
       description: tool.description,
-      inputSchema: toJsonSchema(tool.input),
+      inputSchema: tool.cachedSchema,
     });
   }
   return list;
@@ -271,8 +271,7 @@ async function callTool(
     };
   }
 
-  const schema = toJsonSchema(tool.input);
-  const errors = validate(args, schema);
+  const errors = validate(args, tool.cachedSchema);
   if (errors.length > 0) {
     return {
       content: [{ type: 'text', text: `Validation errors:\n${errors.join('\n')}` }],

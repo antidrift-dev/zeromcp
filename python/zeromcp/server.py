@@ -8,7 +8,7 @@ import sys
 
 from .config import load_config, resolve_transports
 from .scanner import ToolScanner
-from .schema import to_json_schema, validate
+from .schema import validate
 
 
 async def create_handler(config_or_path: dict | str | None = None):
@@ -175,7 +175,7 @@ def _build_tool_list(tools: dict) -> list[dict]:
         result.append({
             "name": name,
             "description": tool["description"],
-            "inputSchema": to_json_schema(tool["input"]),
+            "inputSchema": tool["_cached_schema"],
         })
     return result
 
@@ -193,8 +193,7 @@ async def _call_tool(tools: dict, params: dict, execute_timeout: float = 30) -> 
             "isError": True,
         }
 
-    schema = to_json_schema(tool["input"])
-    errors = validate(args, schema)
+    errors = validate(args, tool["_cached_schema"])
     if errors:
         return {
             "content": [{"type": "text", "text": "Validation errors:\n" + "\n".join(errors)}],

@@ -10,6 +10,8 @@ class Tool
     public array $permissions;
     /** @var callable */
     public $execute;
+    /** Pre-computed JSON Schema for $input, set at load time. */
+    public array $cachedSchema;
 
     public function __construct(
         string $name,
@@ -23,6 +25,7 @@ class Tool
         $this->input = $input;
         $this->permissions = $permissions;
         $this->execute = $execute;
+        $this->cachedSchema = Schema::toJsonSchema($input);
     }
 
     public function call(array $args, ?Context $ctx = null): mixed

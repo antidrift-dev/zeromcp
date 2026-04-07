@@ -125,7 +125,7 @@ class Server
             $list[] = [
                 'name' => $name,
                 'description' => $tool->description,
-                'inputSchema' => Schema::toJsonSchema($tool->input),
+                'inputSchema' => $tool->cachedSchema,
             ];
         }
         return $list;
@@ -144,8 +144,7 @@ class Server
         }
 
         $tool = $this->tools[$name];
-        $schema = Schema::toJsonSchema($tool->input);
-        $errors = Schema::validate($args, $schema);
+        $errors = Schema::validate($args, $tool->cachedSchema);
 
         if (!empty($errors)) {
             return [

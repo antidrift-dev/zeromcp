@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sync"
@@ -30,8 +31,9 @@ type Server struct {
 }
 
 type registeredTool struct {
-	tool Tool
-	ctx  *Ctx
+	tool         Tool
+	ctx          *Ctx
+	cachedSchema JsonSchema
 }
 
 // JSON-RPC types
@@ -87,7 +89,7 @@ func (s *Server) Tool(name string, t Tool) {
 		Bypass:  s.cfg.BypassPermissions,
 	}, creds)
 
-	s.tools[name] = &registeredTool{tool: t, ctx: ctx}
+	s.tools[name] = &registeredTool{tool: t, ctx: ctx, cachedSchema: ToJsonSchema(t.Input)}
 	fmt.Fprintf(os.Stderr, "[zeromcp] Registered: %s\n", name)
 }
 
@@ -140,18 +142,8 @@ func (s *Server) serveStdio(httpAlso bool) {
 			continue
 		}
 
-		var req jsonRPCRequest
-		if err := json.Unmarshal(line, &req); err != nil {
-			continue
-		}
-
-		resp := s.handleRequest(req)
-		if resp == nil {
-			continue
-		}
-
-		out, err := json.Marshal(resp)
-		if err != nil {
+		out := s.HandleRequestBytes(line)
+		if out == nil {
 			continue
 		}
 		fmt.Fprintf(os.Stdout, "%s\n", out)
@@ -203,18 +195,21 @@ func (s *Server) serveHTTP(port int, authConfig string) {
 			}
 		}
 
-		var req jsonRPCRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		body, err := readBody(r.Body)
+		if err != nil {
 			httpJSON(w, jsonRPCResponse{JSONRPC: "2.0", Error: &jsonRPCErr{Code: -32700, Message: "Parse error"}}, 200)
 			return
 		}
 
-		resp := s.handleRequest(req)
-		if resp == nil {
+		out := s.HandleRequestBytes(body)
+		if out == nil {
 			httpJSON(w, jsonRPCResponse{JSONRPC: "2.0", Result: map[string]any{}}, 200)
 			return
 		}
-		httpJSON(w, resp, 200)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write(out)
+		w.Write([]byte("\n"))
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -249,10 +244,40 @@ func writeCORS(w http.ResponseWriter) {
 	w.WriteHeader(204)
 }
 
+func readBody(r io.ReadCloser) ([]byte, error) {
+	defer r.Close()
+	return io.ReadAll(r)
+}
+
 func httpJSON(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// HandleRequestBytes processes raw JSON-RPC bytes and returns raw JSON bytes.
+// Returns nil for notifications that require no response.
+// This avoids the map[string]any marshal/unmarshal round-trip of HandleRequest.
+func (s *Server) HandleRequestBytes(raw []byte) []byte {
+	var req jsonRPCRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		b, _ := json.Marshal(jsonRPCResponse{
+			JSONRPC: "2.0",
+			Error:   &jsonRPCErr{Code: -32700, Message: "Parse error"},
+		})
+		return b
+	}
+
+	resp := s.handleRequest(req)
+	if resp == nil {
+		return nil
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 // HandleRequest processes a single JSON-RPC request and returns a response.
@@ -272,26 +297,13 @@ func (s *Server) HandleRequest(request map[string]any) map[string]any {
 		}
 	}
 
-	var req jsonRPCRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
-		return map[string]any{
-			"jsonrpc": "2.0",
-			"error":   map[string]any{"code": -32700, "message": "Parse error"},
-		}
-	}
-
-	resp := s.handleRequest(req)
-	if resp == nil {
+	out := s.HandleRequestBytes(raw)
+	if out == nil {
 		return nil
 	}
 
-	// Convert to map[string]any for a clean public API
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return nil
-	}
 	var result map[string]any
-	json.Unmarshal(b, &result)
+	json.Unmarshal(out, &result)
 	return result
 }
 
@@ -362,7 +374,7 @@ func (s *Server) buildToolList() []map[string]any {
 		list = append(list, map[string]any{
 			"name":        name,
 			"description": rt.tool.Description,
-			"inputSchema": ToJsonSchema(rt.tool.Input),
+			"inputSchema": rt.cachedSchema,
 		})
 	}
 	return list
@@ -386,8 +398,7 @@ func (s *Server) callTool(params map[string]any) map[string]any {
 		}
 	}
 
-	schema := ToJsonSchema(rt.tool.Input)
-	errors := Validate(args, schema)
+	errors := Validate(args, rt.cachedSchema)
 	if len(errors) > 0 {
 		msg := "Validation errors:\n"
 		for _, e := range errors {

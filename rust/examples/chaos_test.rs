@@ -19,6 +19,7 @@ async fn main() {
                 Ok(Value::String(format!("Hello, {name}!")))
             })
         }),
+        cached_schema: Default::default(),
     });
 
     // Tool that returns an error
@@ -31,6 +32,7 @@ async fn main() {
                 Err("Intentional chaos: unhandled exception".to_string())
             })
         }),
+        cached_schema: Default::default(),
     });
 
     // Tool that hangs forever
@@ -44,6 +46,7 @@ async fn main() {
                 Ok(Value::Null)
             })
         }),
+        cached_schema: Default::default(),
     });
 
     // Tool that takes 3 seconds
@@ -57,6 +60,7 @@ async fn main() {
                 Ok(serde_json::json!({"status": "ok", "delay_ms": 3000}))
             })
         }),
+        cached_schema: Default::default(),
     });
 
     // Tool that leaks memory
@@ -71,6 +75,7 @@ async fn main() {
                 Ok(serde_json::json!({"leaked_buffers": leaks.len(), "total_mb": leaks.len()}))
             })
         }),
+        cached_schema: Default::default(),
     });
 
     // Tool that writes to stdout
@@ -84,6 +89,7 @@ async fn main() {
                 Ok(serde_json::json!({"status": "ok"}))
             })
         }),
+        cached_schema: Default::default(),
     });
 
     server.serve().await;

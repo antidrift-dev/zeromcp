@@ -127,7 +127,7 @@ module ZeroMcp
         {
           'name' => name,
           'description' => tool.description,
-          'inputSchema' => Schema.to_json_schema(tool.input)
+          'inputSchema' => tool.cached_schema
         }
       end
     end
@@ -145,8 +145,7 @@ module ZeroMcp
         }
       end
 
-      schema = Schema.to_json_schema(tool.input)
-      errors = Schema.validate(args, schema)
+      errors = Schema.validate(args, tool.cached_schema)
       if errors.any?
         return {
           'content' => [{ 'type' => 'text', 'text' => "Validation errors:\n#{errors.join("\n")}" }],

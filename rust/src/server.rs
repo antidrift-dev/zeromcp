@@ -32,8 +32,10 @@ impl Server {
     }
 
     /// Register a tool by name.
-    pub fn tool(&mut self, name: &str, tool: Tool) {
+    pub fn tool(&mut self, name: &str, mut tool: Tool) {
         validate_permissions(name, &tool.permissions);
+        // Cache the JSON schema at registration time so it isn't rebuilt per request.
+        tool.cached_schema = tool.input.to_json_schema();
         self.tools.insert(name.to_string(), tool);
     }
 
@@ -42,6 +44,7 @@ impl Server {
     where
         F: Fn(Value, Ctx) -> BoxFuture + Send + Sync + 'static,
     {
+        let cached_schema = input.to_json_schema();
         self.tool(
             name,
             Tool {
@@ -49,6 +52,7 @@ impl Server {
                 input,
                 permissions: Permissions::default(),
                 execute: Box::new(handler),
+                cached_schema,
             },
         );
     }
@@ -182,11 +186,10 @@ impl Server {
         self.tools
             .iter()
             .map(|(name, tool)| {
-                let schema = tool.input.to_json_schema();
                 json!({
                     "name": name,
                     "description": tool.description,
-                    "inputSchema": schema
+                    "inputSchema": tool.cached_schema
                 })
             })
             .collect()
@@ -213,9 +216,8 @@ impl Server {
             }
         };
 
-        // Validate input
-        let schema = tool.input.to_json_schema();
-        let errors = validate(&args, &schema);
+        // Validate input against cached schema
+        let errors = validate(&args, &tool.cached_schema);
         if !errors.is_empty() {
             return json!({
                 "content": [{ "type": "text", "text": format!("Validation errors:\n{}", errors.join("\n")) }],

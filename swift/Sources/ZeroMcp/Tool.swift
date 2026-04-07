@@ -46,6 +46,7 @@ public struct ToolContext {
 public struct ToolDefinition {
     public let description: String
     public let input: InputSchema
+    public let cachedSchema: JsonSchema
     public let permissions: Permissions
     public let execute: ([String: Any], ToolContext) async throws -> Any
 
@@ -57,6 +58,7 @@ public struct ToolDefinition {
     ) {
         self.description = description
         self.input = input
+        self.cachedSchema = toJsonSchema(input)
         self.permissions = permissions
         self.execute = execute
     }

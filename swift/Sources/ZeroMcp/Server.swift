@@ -129,7 +129,7 @@ public class ZeroMcp {
 
     private func buildToolList() -> [[String: Any]] {
         return tools.map { (name, tool) in
-            let schema = toJsonSchema(tool.input)
+            let schema = tool.cachedSchema
             var schemaDict: [String: Any] = [
                 "type": schema.type,
                 "required": schema.required
@@ -163,8 +163,7 @@ public class ZeroMcp {
             ]
         }
 
-        let schema = toJsonSchema(tool.input)
-        let errors = validateInput(args, schema: schema)
+        let errors = validateInput(args, schema: tool.cachedSchema)
         if !errors.isEmpty {
             return [
                 "content": [["type": "text", "text": "Validation errors:\n\(errors.joined(separator: "\n"))"]],

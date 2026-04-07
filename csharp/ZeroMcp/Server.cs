@@ -22,6 +22,7 @@ public class ZeroMcpServer
 
     public void Tool(string name, ToolDefinition tool)
     {
+        tool.CachedSchema = Schema.ToJsonSchema(tool.Input);
         _tools[name] = tool;
     }
 
@@ -31,12 +32,14 @@ public class ZeroMcpServer
         Dictionary<string, InputField>? input = null,
         Func<Dictionary<string, JsonElement>, ToolContext, Task<object>>? execute = null)
     {
-        _tools[name] = new ToolDefinition
+        var def = new ToolDefinition
         {
             Description = description,
             Input = input ?? new(),
             Execute = execute
         };
+        def.CachedSchema = Schema.ToJsonSchema(def.Input);
+        _tools[name] = def;
     }
 
     public async Task Serve()
@@ -172,15 +175,11 @@ public class ZeroMcpServer
 
     private List<Dictionary<string, object>> BuildToolList()
     {
-        return _tools.OrderBy(kv => kv.Key).Select(kv =>
+        return _tools.OrderBy(kv => kv.Key).Select(kv => new Dictionary<string, object>
         {
-            var schema = Schema.ToJsonSchema(kv.Value.Input);
-            return new Dictionary<string, object>
-            {
-                ["name"] = kv.Key,
-                ["description"] = kv.Value.Description,
-                ["inputSchema"] = schema
-            };
+            ["name"] = kv.Key,
+            ["description"] = kv.Value.Description,
+            ["inputSchema"] = kv.Value.CachedSchema!
         }).ToList();
     }
 
@@ -208,8 +207,7 @@ public class ZeroMcpServer
             };
         }
 
-        var schema = Schema.ToJsonSchema(tool.Input);
-        var errors = Schema.Validate(args, schema);
+        var errors = Schema.Validate(args, tool.CachedSchema!);
         if (errors.Count > 0)
         {
             return new Dictionary<string, object>

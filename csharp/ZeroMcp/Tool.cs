@@ -23,4 +23,7 @@ public class ToolDefinition
     public Dictionary<string, InputField> Input { get; set; } = new();
     public Permissions? Permissions { get; set; }
     public Func<Dictionary<string, JsonElement>, ToolContext, Task<object>>? Execute { get; set; }
+
+    /// <summary>Cached JSON schema, computed once at registration time.</summary>
+    internal JsonSchema? CachedSchema { get; set; }
 }
