@@ -40,7 +40,7 @@ const REQUESTS = [
   // 10% — resources/read
   ...Array(10).fill(() => ({
     jsonrpc: '2.0', id: nextId(), method: 'resources/read',
-    params: { uri: 'resource:///config.json' },
+    params: { uri: 'resource:///data.json' },
   })),
   // 10% — tools/list
   ...Array(10).fill(() => ({
@@ -49,7 +49,7 @@ const REQUESTS = [
   // 5% — prompts/get
   ...Array(5).fill(() => ({
     jsonrpc: '2.0', id: nextId(), method: 'prompts/get',
-    params: { name: 'summarize', arguments: { text: 'ZeroMCP is fast', style: 'brief' } },
+    params: { name: 'greet', arguments: { name: 'Alice', tone: 'formal' } },
   })),
   // 5% — resources/list
   ...Array(5).fill(() => ({

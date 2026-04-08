@@ -1,12 +1,10 @@
-tool = {
-    "description": "Greeting prompt",
-    "arguments": {
-        "name": "string",
-        "tone": {"type": "string", "optional": True, "description": "formal or casual"},
-    },
+description = "Greeting prompt"
+arguments = {
+    "name": "string",
+    "tone": {"type": "string", "optional": True, "description": "formal or casual"},
 }
 
-async def render(args, ctx=None):
+async def render(args):
     name = args.get("name", "world")
     tone = args.get("tone", "casual")
     return [

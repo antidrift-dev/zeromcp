@@ -1,7 +1,5 @@
-tool = {
-    "description": "Dynamic test resource",
-    "mimeType": "application/json",
-}
+description = "Dynamic test resource"
+mime_type = "application/json"
 
-async def read(ctx=None):
+async def read():
     return '{"dynamic": true, "timestamp": "test"}'
