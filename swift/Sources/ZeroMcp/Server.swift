@@ -442,12 +442,18 @@ public class ZeroMcp {
             let text: String
             if let s = result as? String {
                 text = s
-            } else if let data = try? JSONSerialization.data(
-                withJSONObject: result,
-                options: []
-            ) {
-                text = String(data: data, encoding: .utf8) ?? "\(result)"
+            } else if JSONSerialization.isValidJSONObject(result),
+                      let data = try? JSONSerialization.data(
+                          withJSONObject: result,
+                          options: []
+                      ),
+                      let str = String(data: data, encoding: .utf8) {
+                // Collections (dicts/arrays) — encode as JSON
+                text = str
             } else {
+                // Primitives (Bool, Int, Double, etc.) — JSONSerialization
+                // fatalErrors on non-collection top-level values on Linux,
+                // so we must stringify these directly.
                 text = "\(result)"
             }
             return ["content": [["type": "text", "text": text]]]

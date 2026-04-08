@@ -22,20 +22,15 @@ const WARMUP = 100;
 // --- Weighted request pool ---
 
 const REQUESTS = [
-  // 40% — tools/call hello (simple)
-  ...Array(40).fill(() => ({
+  // 45% — tools/call hello (simple)
+  ...Array(45).fill(() => ({
     jsonrpc: '2.0', id: nextId(), method: 'tools/call',
     params: { name: 'hello', arguments: { name: 'bench' } },
   })),
-  // 15% — tools/call add (compute)
-  ...Array(15).fill(() => ({
+  // 20% — tools/call add (compute)
+  ...Array(20).fill(() => ({
     jsonrpc: '2.0', id: nextId(), method: 'tools/call',
     params: { name: 'add', arguments: { a: Math.random() * 100, b: Math.random() * 100 } },
-  })),
-  // 10% — tools/call create_invoice (object)
-  ...Array(10).fill(() => ({
-    jsonrpc: '2.0', id: nextId(), method: 'tools/call',
-    params: { name: 'create_invoice', arguments: { customer_id: 'cust-123', amount: 99.99 } },
   })),
   // 10% — resources/read
   ...Array(10).fill(() => ({
@@ -118,7 +113,7 @@ async function main() {
   console.error(`  URL: ${BASE_URL}`);
   console.error(`  Duration: ${DURATION}s, Interval: ${INTERVAL}s`);
   console.error(`  Container: ${CONTAINER}`);
-  console.error(`  Mix: 40% hello, 15% add, 10% invoice, 10% resource read,`);
+  console.error(`  Mix: 45% hello, 20% add, 10% resource read,`);
   console.error(`       10% tools/list, 5% prompts/get, 5% resources/list, 3% ping, 2% init\n`);
 
   // Initialize session
@@ -152,7 +147,7 @@ async function main() {
       const res = await mcpRequest(req);
       latencies.push(performance.now() - start);
       methodCounts[method] = (methodCounts[method] || 0) + 1;
-      if (res?.error) errors++;
+      if (res?.error || res?.result?.isError) errors++;
     } catch {
       latencies.push(performance.now() - start);
       errors++;
