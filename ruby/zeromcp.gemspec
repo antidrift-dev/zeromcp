@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name        = 'zeromcp'
-  s.version     = '0.1.1'
+  s.version     = '0.2.0'
   s.summary     = 'Zero-config MCP runtime'
   s.description = 'Drop tool files in a directory, get a working MCP server. Zero boilerplate.'
   s.authors     = ['Antidrift']
