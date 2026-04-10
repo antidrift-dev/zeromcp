@@ -13,10 +13,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
+          token: ${{ secrets.PAT_SUBTREE }}
 
       - name: Push subtree to zeromcp-php
         run: |
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com" > ~/.git-credentials
           SHA=$(git subtree split --prefix=php HEAD)
-          git push "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/heads/main" --force
-          git push "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/tags/${{ github.ref_name }}" --force
+          git push "https://github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/heads/main" --force
+          git push "https://github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/tags/${{ github.ref_name }}" --force
