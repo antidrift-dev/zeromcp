@@ -150,7 +150,7 @@ Tools receive secrets via `ctx.credentials`, configured per namespace in `zeromc
 
 ## Directory structure
 
-Tools are discovered recursively. Subdirectory names become namespace prefixes:
+Tools are discovered recursively. Subdirectory names become namespace prefixes. `node_modules` directories are skipped automatically.
 
 ```
 tools/
