@@ -1,7 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolveToolSources, resolveIcon } from '../dist/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,5 +96,65 @@ describe('resolveIcon', () => {
     } finally {
       await unlink(tmpPath);
     }
+  });
+});
+
+import { ToolScanner } from '../dist/scanner.js';
+
+const TMP_CREDS = join(tmpdir(), 'zeromcp-test-creds');
+
+describe('resolveCredentials caching', () => {
+  beforeEach(() => {
+    rmSync(TMP_CREDS, { recursive: true, force: true });
+    mkdirSync(TMP_CREDS, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TMP_CREDS, { recursive: true, force: true });
+  });
+
+  it('cache_credentials defaults to true', () => {
+    const scanner = new ToolScanner({});
+    assert.equal(scanner.cacheCredentials, true);
+  });
+
+  it('reads credential file only once when cache_credentials is true', () => {
+    const toolDir = join(TMP_CREDS, 'myservice');
+    mkdirSync(toolDir);
+    const credFile = join(TMP_CREDS, 'creds.json');
+    writeFileSync(credFile, JSON.stringify({ token: 'first' }));
+
+    const scanner = new ToolScanner({
+      credentials: { myservice: { file: credFile } },
+      cache_credentials: true,
+    });
+
+    const filePath = join(toolDir, 'tool.js');
+    const result1 = scanner._resolveCredentials(filePath, TMP_CREDS);
+    writeFileSync(credFile, JSON.stringify({ token: 'second' }));
+    const result2 = scanner._resolveCredentials(filePath, TMP_CREDS);
+
+    assert.deepEqual(result1, { token: 'first' });
+    assert.deepEqual(result2, { token: 'first' });
+  });
+
+  it('re-reads credential file on every call when cache_credentials is false', () => {
+    const toolDir = join(TMP_CREDS, 'myservice');
+    mkdirSync(toolDir);
+    const credFile = join(TMP_CREDS, 'creds.json');
+    writeFileSync(credFile, JSON.stringify({ token: 'first' }));
+
+    const scanner = new ToolScanner({
+      credentials: { myservice: { file: credFile } },
+      cache_credentials: false,
+    });
+
+    const filePath = join(toolDir, 'tool.js');
+    const result1 = scanner._resolveCredentials(filePath, TMP_CREDS);
+    writeFileSync(credFile, JSON.stringify({ token: 'second' }));
+    const result2 = scanner._resolveCredentials(filePath, TMP_CREDS);
+
+    assert.deepEqual(result1, { token: 'first' });
+    assert.deepEqual(result2, { token: 'second' });
   });
 });

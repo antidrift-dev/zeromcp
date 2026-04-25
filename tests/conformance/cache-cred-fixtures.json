@@ -1,0 +1,45 @@
+{
+  "tests": [
+    {
+      "name": "cache_cred_init",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": { "name": "cache-cred-test", "version": "1.0" }
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": { "protocolVersion": "2024-11-05" }
+      },
+      "match": "partial"
+    },
+    {
+      "name": "cache_cred_initialized",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "match": "silent"
+    },
+    {
+      "name": "cache_cred_token_returned",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+          "name": "tokenstore_check",
+          "arguments": {}
+        }
+      },
+      "expect_content_json": { "token": "static-test-token-abc" },
+      "match": "content_json"
+    }
+  ]
+}

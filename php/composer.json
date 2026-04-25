@@ -3,7 +3,7 @@
   "description": "Zero-config MCP runtime for PHP",
   "type": "library",
   "license": "MIT",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "keywords": ["mcp", "zero-config", "tools", "ai-agents"],
   "homepage": "https://github.com/antidrift-dev/zeromcp",
   "authors": [

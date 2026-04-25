@@ -19,6 +19,10 @@ pub struct Config {
     /// Default execute timeout in milliseconds (default 30000).
     #[serde(default = "default_execute_timeout")]
     pub execute_timeout: u64,
+
+    /// Cache credentials after first read when true (default). Set false to re-read on every tool call.
+    #[serde(default = "default_cache_credentials")]
+    pub cache_credentials: bool,
 }
 
 fn default_separator() -> String {
@@ -29,6 +33,10 @@ fn default_execute_timeout() -> u64 {
     30000
 }
 
+fn default_cache_credentials() -> bool {
+    true
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -36,6 +44,7 @@ impl Default for Config {
             bypass_permissions: false,
             separator: "_".to_string(),
             execute_timeout: 30000,
+            cache_credentials: true,
         }
     }
 }

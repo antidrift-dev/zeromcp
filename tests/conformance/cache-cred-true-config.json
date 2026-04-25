@@ -1,0 +1,7 @@
+{
+  "tools": ["./tests/conformance/cache-cred-tools"],
+  "credentials": {
+    "tokenstore": { "file": "/tmp/test-token-creds.json" }
+  },
+  "cache_credentials": true
+}

@@ -66,14 +66,15 @@ type PromptDef struct {
 
 // Server is a zero-config MCP server.
 type Server struct {
-	mu            sync.RWMutex
-	tools         map[string]*registeredTool
-	resources     map[string]*registeredResource
-	templates     map[string]*registeredTemplate
-	prompts       map[string]*registeredPrompt
-	subscriptions map[string]bool
-	logLevel      string
-	cfg           Config
+	mu                sync.RWMutex
+	tools             map[string]*registeredTool
+	resources         map[string]*registeredResource
+	templates         map[string]*registeredTemplate
+	prompts           map[string]*registeredPrompt
+	subscriptions     map[string]bool
+	logLevel          string
+	cfg               Config
+	credentialCache   map[string]any
 }
 
 type registeredTool struct {
@@ -133,14 +134,35 @@ func newServer(cfg Config) *Server {
 	cfg.Icon = icon
 
 	return &Server{
-		tools:         make(map[string]*registeredTool),
-		resources:     make(map[string]*registeredResource),
-		templates:     make(map[string]*registeredTemplate),
-		prompts:       make(map[string]*registeredPrompt),
-		subscriptions: make(map[string]bool),
-		logLevel:      "info",
-		cfg:           cfg,
+		tools:           make(map[string]*registeredTool),
+		resources:       make(map[string]*registeredResource),
+		templates:       make(map[string]*registeredTemplate),
+		prompts:         make(map[string]*registeredPrompt),
+		subscriptions:   make(map[string]bool),
+		logLevel:        "info",
+		cfg:             cfg,
+		credentialCache: make(map[string]any),
 	}
+}
+
+// ResolveToolCredentials resolves credentials for the given namespace key.
+// When CacheCredentials is true (default), caches after first read. Set false to read fresh on every call.
+func (s *Server) ResolveToolCredentials(ns string) any {
+	source, ok := s.cfg.Credentials[ns]
+	if !ok {
+		return nil
+	}
+	if s.cfg.CacheCredentials == nil || !*s.cfg.CacheCredentials {
+		return ResolveCredentials(source)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cached, hit := s.credentialCache[ns]; hit {
+		return cached
+	}
+	creds := ResolveCredentials(source)
+	s.credentialCache[ns] = creds
+	return creds
 }
 
 // resolveIcon resolves an icon path to a data URI at startup.

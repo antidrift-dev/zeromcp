@@ -13,7 +13,8 @@ data class ZeroMcpConfig(
     val separator: String = "_",
     val name: String = "zeromcp",
     val version: String = "0.1.0",
-    val execute_timeout: Long = 30000 // ms
+    val execute_timeout: Long = 30000, // ms
+    val cache_credentials: Boolean = true
 )
 
 private val json = Json { ignoreUnknownKeys = true }

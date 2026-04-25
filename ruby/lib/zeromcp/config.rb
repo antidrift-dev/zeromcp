@@ -24,12 +24,13 @@ module ZeroMcp
       @bypass_permissions = opts[:bypass_permissions] || opts['bypass_permissions'] || false
       @execute_timeout = opts[:execute_timeout] || opts['execute_timeout'] || 30 # seconds
       @credentials = opts[:credentials] || opts['credentials'] || {}
+      @cache_credentials = opts.key?(:cache_credentials) ? opts[:cache_credentials] : (opts.key?('cache_credentials') ? opts['cache_credentials'] : true)
       @namespacing = opts[:namespacing] || opts['namespacing'] || {}
       @page_size = opts[:page_size] || opts['page_size'] || 0
       @icon = opts[:icon] || opts['icon']
     end
 
-    attr_reader :credentials, :namespacing
+    attr_reader :credentials, :cache_credentials, :namespacing
 
     def self.load(path = nil)
       path ||= File.join(Dir.pwd, 'zeromcp.config.json')

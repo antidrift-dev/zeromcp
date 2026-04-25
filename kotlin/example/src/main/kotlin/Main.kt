@@ -21,6 +21,10 @@ fun main() {
         credentialTestMain()
         return
     }
+    if (System.getenv("ZEROMCP_CACHE_CRED_TEST") == "true") {
+        cacheCredTestMain()
+        return
+    }
     if (System.getenv("ZEROMCP_RESOURCE_TEST") == "true") {
         resourceTestMain()
         return

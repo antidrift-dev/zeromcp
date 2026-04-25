@@ -1,6 +1,6 @@
 [package]
 name = "zeromcp"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2021"
 description = "Zero-config MCP runtime — Rust library"
 license = "MIT"
@@ -39,3 +39,7 @@ path = "examples/bypass_test.rs"
 [[example]]
 name = "credential_test"
 path = "examples/credential_test.rs"
+
+[[example]]
+name = "cache_cred_test"
+path = "examples/cache_cred_test.rs"

@@ -37,6 +37,7 @@ export interface Config {
   separator?: string;
   namespacing?: Record<string, NamespaceOverride>;
   credentials?: Record<string, CredentialSource>;
+  cache_credentials?: boolean; // default true — set false to re-read credentials on every tool call
   remote?: RemoteServer[];
   execute_timeout?: number; // ms, default 30000
   page_size?: number; // 0 = no pagination (default)

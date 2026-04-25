@@ -26,6 +26,9 @@ public class Config {
     @SerializedName("execute_timeout")
     private long executeTimeout = 30000; // ms
 
+    @SerializedName("cache_credentials")
+    private boolean cacheCredentials = true;
+
     private static final Gson GSON = new Gson();
 
     public String transport() { return transport; }
@@ -36,6 +39,7 @@ public class Config {
     public String name() { return name; }
     public String version() { return version; }
     public long executeTimeout() { return executeTimeout; }
+    public boolean cacheCredentials() { return cacheCredentials; }
 
     /**
      * Loads config from zeromcp.config.json in the given directory.

@@ -18,6 +18,8 @@ class Server
     private array $subscriptions = [];
     private string $logLevel = 'info';
     private ?string $icon = null;
+    /** @var array<string, mixed> credential cache keyed by namespace */
+    private array $credentialCache = [];
 
     private const ICON_MIME = [
         'png'  => 'image/png',
@@ -430,10 +432,23 @@ class Server
         foreach ($this->config->credentials as $ns => $source) {
             $sep = $this->config->separator;
             if (str_starts_with($toolName, "{$ns}_") || str_starts_with($toolName, "{$ns}{$sep}")) {
-                return $this->resolveCredentialSource($source);
+                return $this->resolveCredentialsForNs((string) $ns, $source);
             }
         }
         return null;
+    }
+
+    private function resolveCredentialsForNs(string $ns, array $source): mixed
+    {
+        if (!$this->config->cacheCredentials) {
+            return $this->resolveCredentialSource($source);
+        }
+        if (array_key_exists($ns, $this->credentialCache)) {
+            return $this->credentialCache[$ns];
+        }
+        $creds = $this->resolveCredentialSource($source);
+        $this->credentialCache[$ns] = $creds;
+        return $creds;
     }
 
     private function resolveCredentialSource(array $source): mixed

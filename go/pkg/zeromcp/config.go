@@ -14,6 +14,7 @@ type Config struct {
 	BypassPermissions bool                         `json:"bypass_permissions,omitempty"`
 	Separator         string                       `json:"separator,omitempty"`
 	Credentials       map[string]CredentialSource   `json:"credentials,omitempty"`
+	CacheCredentials  *bool                        `json:"cache_credentials,omitempty"` // default true
 	ExecuteTimeout    int                          `json:"execute_timeout,omitempty"` // ms, default 30000
 	PageSize          int                          `json:"page_size,omitempty"`       // 0 = no pagination
 	Icon              string                       `json:"icon,omitempty"`            // data URI, URL, or file path (resolved at startup)
@@ -45,6 +46,12 @@ func LoadConfig(path string) (Config, error) {
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("invalid config: %w", err)
+	}
+
+	// Default cache_credentials to true when not explicitly set in config
+	if cfg.CacheCredentials == nil {
+		t := true
+		cfg.CacheCredentials = &t
 	}
 
 	return cfg, nil

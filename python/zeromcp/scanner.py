@@ -20,6 +20,7 @@ class ToolScanner:
         self.namespacing: dict = config.get("namespacing", {})
         self.credential_sources: dict = config.get("credentials", {})
         self.credential_cache: dict = {}
+        self.cache_credentials: bool = config.get("cache_credentials", True)
         self.logging: bool = config.get("logging", False)
         self.bypass: bool = config.get("bypass_permissions", False)
 
@@ -64,23 +65,22 @@ class ToolScanner:
             return f"{source_prefix}{self.separator}{inner_name}"
         return inner_name
 
-    def _get_credentials(self, file_path: Path, root_dir: Path):
+    def _resolve_credentials(self, file_path: Path, root_dir: Path):
         rel = file_path.relative_to(root_dir)
         parts = list(rel.parts)
         if len(parts) < 2:
             return None
-
         dir_name = parts[0]
-        if dir_name in self.credential_cache:
-            return self.credential_cache[dir_name]
-
         source = self.credential_sources.get(dir_name)
         if not source:
             return None
-
-        creds = resolve_credentials(source)
-        self.credential_cache[dir_name] = creds
-        return creds
+        if self.cache_credentials:
+            if dir_name in self.credential_cache:
+                return self.credential_cache[dir_name]
+            creds = resolve_credentials(source)
+            self.credential_cache[dir_name] = creds
+            return creds
+        return resolve_credentials(source)
 
     def _load_tool(self, file_path: Path, root_dir: Path, source_prefix: str | None) -> None:
         try:
@@ -101,16 +101,16 @@ class ToolScanner:
         permissions = tool_meta.get("permissions")
         validate_permissions(name, permissions)
 
-        credentials = self._get_credentials(file_path, root_dir)
         sandbox_opts = {"logging": self.logging, "bypass": self.bypass}
         sandbox = create_sandbox(name, permissions, sandbox_opts)
 
-        ctx = _ToolContext(credentials=credentials, fetch=sandbox["fetch"])
-
-        # Wrap execute to inject ctx
+        # Wrap execute to inject ctx — credentials resolved fresh each call
         raw_execute = execute_fn
+        scanner = self
 
-        async def wrapped_execute(args: dict, _ctx=ctx):
+        async def wrapped_execute(args: dict, _fp=file_path, _rd=root_dir, _fetch=sandbox["fetch"]):
+            creds = scanner._resolve_credentials(_fp, _rd)
+            _ctx = _ToolContext(credentials=creds, fetch=_fetch)
             return await raw_execute(args, _ctx)
 
         input_schema = tool_meta.get("input", {})

@@ -6,7 +6,7 @@
  */
 
 import { spawn, fork } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
@@ -68,7 +68,7 @@ const protocolImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'Main'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'Main'],
     optional: true,
   },
   {
@@ -108,7 +108,7 @@ const sandboxImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'SandboxTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'SandboxTest'],
     optional: true,
   },
   {
@@ -176,7 +176,7 @@ const credentialImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CredentialTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CredentialTest'],
     env: { TEST_CRM_KEY: 'test-secret-123' },
     optional: true,
   },
@@ -271,7 +271,7 @@ const resourceImplementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'ResourceTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'ResourceTest'],
     optional: true,
   },
   {
@@ -353,7 +353,7 @@ const suites = [
       {
         name: 'Java',
         command: 'java',
-        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'TimeoutTest'],
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'TimeoutTest'],
         optional: true,
       },
       {
@@ -421,7 +421,7 @@ const suites = [
       {
         name: 'Java',
         command: 'java',
-        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.1.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'BypassTest'],
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'BypassTest'],
         env: { ZEROMCP_BYPASS: 'true' },
         optional: true,
       },
@@ -549,6 +549,150 @@ const suites = [
       },
     ],
   },
+  {
+    name: 'Cache Credentials (enabled)',
+    fixtures: 'cache-cred-fixtures.json',
+    setup: setupTokenCredFile,
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'cache-cred-true-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'cache-cred-true-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'cache-cred-true-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'cache-cred-true-config.json')],
+        optional: true,
+      },
+      {
+        name: 'Go',
+        command: existsSync('/usr/local/bin/zeromcp-go-cache-cred') ? '/usr/local/bin/zeromcp-go-cache-cred' : join(root, 'go/examples/cache-cred-test/zeromcp-go-cache-cred'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Rust',
+        command: join(root, 'rust/target/release/examples/cache_cred_test'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Java',
+        command: 'java',
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CacheCredTest'],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Kotlin',
+        command: join(root, 'kotlin/example/build/install/example/bin/example'),
+        args: [],
+        env: { JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8', ZEROMCP_CACHE_CRED_TEST: 'true', ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Swift',
+        command: existsSync('/usr/local/bin/zeromcp-swift-cache-cred') ? '/usr/local/bin/zeromcp-swift-cache-cred' : join(root, 'swift/.build/debug/zeromcp-cache-cred-test'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+      {
+        name: 'C#',
+        command: existsSync('/tmp/csharp-cache-cred-out/CacheCredTest') ? '/tmp/csharp-cache-cred-out/CacheCredTest' : 'dotnet',
+        args: existsSync('/tmp/csharp-cache-cred-out/CacheCredTest') ? [] : ['run', '--project', join(root, 'csharp/CacheCredTest'), '--no-build'],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-true-config.json') },
+        optional: true,
+      },
+    ],
+  },
+  {
+    name: 'Cache Credentials (disabled)',
+    fixtures: 'cache-cred-fixtures.json',
+    setup: setupTokenCredFile,
+    implementations: [
+      {
+        name: 'Node.js',
+        command: 'node',
+        args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'cache-cred-false-config.json')],
+      },
+      {
+        name: 'Python',
+        command: 'python3',
+        args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'cache-cred-false-config.json')],
+        env: { PYTHONPATH: join(root, 'python') },
+      },
+      {
+        name: 'Ruby',
+        command: 'ruby',
+        args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'cache-cred-false-config.json')],
+        optional: true,
+      },
+      {
+        name: 'PHP',
+        command: 'php',
+        args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'cache-cred-false-config.json')],
+        optional: true,
+      },
+      {
+        name: 'Go',
+        command: existsSync('/usr/local/bin/zeromcp-go-cache-cred') ? '/usr/local/bin/zeromcp-go-cache-cred' : join(root, 'go/examples/cache-cred-test/zeromcp-go-cache-cred'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Rust',
+        command: join(root, 'rust/target/release/examples/cache_cred_test'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Java',
+        command: 'java',
+        args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'CacheCredTest'],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Kotlin',
+        command: join(root, 'kotlin/example/build/install/example/bin/example'),
+        args: [],
+        env: { JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8', ZEROMCP_CACHE_CRED_TEST: 'true', ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+      {
+        name: 'Swift',
+        command: existsSync('/usr/local/bin/zeromcp-swift-cache-cred') ? '/usr/local/bin/zeromcp-swift-cache-cred' : join(root, 'swift/.build/debug/zeromcp-cache-cred-test'),
+        args: [],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+      {
+        name: 'C#',
+        command: existsSync('/tmp/csharp-cache-cred-out/CacheCredTest') ? '/tmp/csharp-cache-cred-out/CacheCredTest' : 'dotnet',
+        args: existsSync('/tmp/csharp-cache-cred-out/CacheCredTest') ? [] : ['run', '--project', join(root, 'csharp/CacheCredTest'), '--no-build'],
+        env: { ZEROMCP_CONFIG: join(__dirname, 'cache-cred-false-config.json') },
+        optional: true,
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -574,6 +718,10 @@ function stopMockServer() {
     if (mockServer) mockServer.close(resolve);
     else resolve();
   });
+}
+
+function setupTokenCredFile() {
+  writeFileSync('/tmp/test-token-creds.json', JSON.stringify({ token: 'static-test-token-abc' }));
 }
 
 // ---------------------------------------------------------------------------

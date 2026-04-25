@@ -12,6 +12,7 @@ class Config
     public bool $bypassPermissions;
     public int $executeTimeout;
     public array $credentials;
+    public bool $cacheCredentials;
     public int $pageSize;
     public ?string $icon;
 
@@ -31,6 +32,7 @@ class Config
         $this->bypassPermissions = $opts['bypass_permissions'] ?? false;
         $this->executeTimeout = $opts['execute_timeout'] ?? 30;
         $this->credentials = $opts['credentials'] ?? [];
+        $this->cacheCredentials = $opts['cache_credentials'] ?? true;
         $this->pageSize = $opts['page_size'] ?? 0;
         $this->icon = $opts['icon'] ?? null;
     }

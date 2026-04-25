@@ -196,7 +196,7 @@ public class ZeroMcp {
 
         var serverInfo: [String: Any] = [
             "name": "zeromcp",
-            "version": "0.2.0"
+            "version": "0.2.2"
         ]
         if let icon = icon {
             serverInfo["icon"] = icon

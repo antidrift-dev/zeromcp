@@ -13,6 +13,7 @@ let package = Package(
         .executable(name: "zeromcp-bypass-test", targets: ["BypassTest"]),
         .executable(name: "zeromcp-credential-test", targets: ["CredentialTest"]),
         .executable(name: "zeromcp-resource-test", targets: ["ZeroMcpResourceTest"]),
+        .executable(name: "zeromcp-cache-cred-test", targets: ["CacheCredTest"]),
     ],
     targets: [
         .target(
@@ -53,6 +54,11 @@ let package = Package(
             name: "ZeroMcpResourceTest",
             dependencies: ["ZeroMcp"],
             path: "Sources/ZeroMcpResourceTest"
+        ),
+        .executableTarget(
+            name: "CacheCredTest",
+            dependencies: ["ZeroMcp"],
+            path: "Sources/CacheCredTest"
         ),
         .testTarget(
             name: "ZeroMcpTests",

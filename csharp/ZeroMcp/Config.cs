@@ -20,6 +20,9 @@ public class ZeroMcpConfig
     [JsonPropertyName("execute_timeout")]
     public int? ExecuteTimeout { get; set; } // ms, default 30000
 
+    [JsonPropertyName("cache_credentials")]
+    public bool? CacheCredentials { get; set; } = true; // default true
+
     public static ZeroMcpConfig Load(string? path = null)
     {
         path ??= Path.Combine(Directory.GetCurrentDirectory(), "zeromcp.config.json");

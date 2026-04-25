@@ -23,6 +23,7 @@ module ZeroMcp
       @subscriptions = {}
       @log_level = 'info'
       @icon = nil
+      @credential_cache = {}
     end
 
     # Load tools (and resources/prompts) from the configured directories.
@@ -441,13 +442,20 @@ module ZeroMcp
 
     def _resolve_credentials(tool_name)
       return nil if @config.credentials.empty?
-      # Match credential namespace from tool name prefix
       @config.credentials.each do |ns, source|
         if tool_name.start_with?("#{ns}_") || tool_name.start_with?("#{ns}#{@config.separator}")
-          return _resolve_credential_source(source)
+          return _resolve_credentials_for_ns(ns.to_s, source)
         end
       end
       nil
+    end
+
+    def _resolve_credentials_for_ns(ns, source)
+      return _resolve_credential_source(source) unless @config.cache_credentials
+      return @credential_cache[ns] if @credential_cache.key?(ns)
+      creds = _resolve_credential_source(source)
+      @credential_cache[ns] = creds
+      creds
     end
 
     def _resolve_credential_source(source)
