@@ -57,6 +57,74 @@ class Server
         $this->icon = $this->resolveIcon($this->config->icon);
     }
 
+    /**
+     * Start an HTTP server that handles both /mcp (JSON-RPC over HTTP) and
+     * any tool routes defined via the `route` field (method + path).
+     *
+     * This uses PHP's built-in single-request CGI/SAPI model: one request per
+     * process invocation. When running under php -S (built-in web server) or
+     * a traditional web server (Apache/nginx + PHP-FPM), each request is
+     * handled by this method.
+     */
+    public function serveHttp(): void
+    {
+        $this->loadTools();
+        fwrite(STDERR, "[zeromcp] HTTP transport ready\n");
+
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+
+        // /mcp — JSON-RPC endpoint
+        if ($path === '/mcp') {
+            $body    = file_get_contents('php://input');
+            $request = json_decode($body, true);
+            if (!is_array($request)) {
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Invalid JSON-RPC request']);
+                return;
+            }
+            $response = $this->handleRequest($request);
+            header('Content-Type: application/json');
+            echo json_encode($response, JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
+        // Tool routes
+        foreach ($this->tools as $tool) {
+            if ($tool->route === null) continue;
+            $routeMethod = strtoupper($tool->route['method'] ?? '');
+            $routePath   = $tool->route['path'] ?? '';
+            if ($routeMethod !== strtoupper($method)) continue;
+            $pathParams = self::matchRoutePath($routePath, $path);
+            if ($pathParams === null) continue;
+
+            // Build args: path params + query/body params
+            if ($method === 'GET') {
+                $args = array_merge($_GET, $pathParams);
+            } else {
+                $body = file_get_contents('php://input');
+                $bodyArgs = json_decode($body, true) ?? [];
+                $args = array_merge($bodyArgs, $pathParams);
+            }
+
+            try {
+                $result = $tool->call($args);
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => true, 'result' => $result], JSON_UNESCAPED_SLASHES);
+            } catch (\Throwable $e) {
+                http_response_code(500);
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
+            }
+            return;
+        }
+
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Not found']);
+    }
+
     public function serve(): void
     {
         $this->loadTools();
@@ -471,6 +539,33 @@ class Server
     }
 
     // --- Utilities ---
+
+    /**
+     * Match an incoming path against a route pattern with :param segments.
+     * Returns an associative array of extracted params, or null if no match.
+     *
+     * Example: matchRoutePath('/:domain/leads', '/acme/leads') => ['domain' => 'acme']
+     *
+     * @return array<string,string>|null
+     */
+    private static function matchRoutePath(string $pattern, string $path): ?array
+    {
+        $regex = preg_replace_callback('/:([a-zA-Z_][a-zA-Z0-9_]*)/', function ($m) {
+            return '(?P<' . $m[1] . '>[^/]+)';
+        }, preg_quote($pattern, '/'));
+
+        if (!preg_match('/^' . $regex . '$/', $path, $matches)) {
+            return null;
+        }
+
+        $params = [];
+        foreach ($matches as $key => $value) {
+            if (is_string($key)) {
+                $params[$key] = $value;
+            }
+        }
+        return $params;
+    }
 
     /**
      * Base64 cursor-based pagination. pageSize 0 = no pagination.

@@ -20,6 +20,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     // Tool that returns an error
@@ -33,6 +34,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     // Tool that hangs forever
@@ -47,6 +49,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     // Tool that takes 3 seconds
@@ -61,6 +64,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     // Tool that leaks memory
@@ -76,6 +80,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     // Tool that writes to stdout
@@ -90,6 +95,7 @@ async fn main() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     });
 
     server.serve().await;

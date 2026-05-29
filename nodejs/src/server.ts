@@ -161,12 +161,51 @@ function startHttp(state: ServerState, port: number, authConfig?: string): void 
       return;
     }
 
+    for (const [, tool] of state.tools) {
+      if (!tool.route) continue;
+      if (tool.route.method.toUpperCase() !== req.method) continue;
+      const pathParams = matchRoute(tool.route.path, url.pathname);
+      if (pathParams === null) continue;
+
+      try {
+        let args: Record<string, unknown> = { ...pathParams };
+        if (req.method === 'GET') {
+          for (const [k, v] of url.searchParams) args[k] = v;
+        } else {
+          const body = await parseBody(req);
+          if (body && typeof body === 'object' && !Array.isArray(body)) {
+            args = { ...args, ...(body as Record<string, unknown>) };
+          }
+        }
+        const result = await tool.execute(args);
+        json(res, { ok: true, result });
+      } catch (err) {
+        json(res, { ok: false, error: (err as Error).message }, 500);
+      }
+      return;
+    }
+
     json(res, { error: 'Not found' }, 404);
   });
 
   server.listen(port, () => {
     console.error(`[zeromcp] http transport ready on port ${port}`);
   });
+}
+
+function matchRoute(pattern: string, pathname: string): Record<string, string> | null {
+  const patternParts = pattern.split('/');
+  const pathParts = pathname.split('/');
+  if (patternParts.length !== pathParts.length) return null;
+  const params: Record<string, string> = {};
+  for (let i = 0; i < patternParts.length; i++) {
+    if (patternParts[i].startsWith(':')) {
+      params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+    } else if (patternParts[i] !== pathParts[i]) {
+      return null;
+    }
+  }
+  return params;
 }
 
 function parseBody(req: import('http').IncomingMessage): Promise<JsonRpcRequest> {

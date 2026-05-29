@@ -71,6 +71,14 @@ data class Ctx(
 )
 
 /**
+ * Optional HTTP route for a tool.
+ */
+data class RouteConfig(
+    val method: String, // GET, POST, PUT, PATCH, DELETE
+    val path: String    // e.g. "/:domain/leads"
+)
+
+/**
  * Registered tool definition.
  */
 data class ToolDefinition(
@@ -78,6 +86,7 @@ data class ToolDefinition(
     val description: String,
     val input: InputSchema,
     val permissions: Permissions,
+    val route: RouteConfig? = null,
     val execute: suspend (args: Map<String, Any?>, ctx: Ctx) -> Any?
 )
 
@@ -145,6 +154,7 @@ class ToolBuilder(private val name: String) {
     var description: String = ""
     private val inputFields = mutableMapOf<String, InputField>()
     private var perms = Permissions()
+    private var routeConfig: RouteConfig? = null
     private var executeFn: (suspend (Map<String, Any?>, Ctx) -> Any?)? = null
 
     fun input(block: InputBuilder.() -> Unit) {
@@ -159,6 +169,10 @@ class ToolBuilder(private val name: String) {
         perms = builder.build()
     }
 
+    fun route(method: String, path: String) {
+        routeConfig = RouteConfig(method.uppercase(), path)
+    }
+
     fun execute(fn: suspend (args: Map<String, Any?>, ctx: Ctx) -> Any?) {
         executeFn = fn
     }
@@ -169,6 +183,7 @@ class ToolBuilder(private val name: String) {
             description = description,
             input = inputFields.toMap(),
             permissions = perms,
+            route = routeConfig,
             execute = executeFn ?: throw IllegalStateException("Tool '$name' has no execute block")
         )
     }

@@ -1,10 +1,13 @@
 package io.antidrift.zeromcp
 
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
+import java.net.InetSocketAddress
 
 /**
  * ZeroMcp — zero-config MCP runtime for Kotlin.
@@ -114,6 +117,93 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
                 System.out.flush()
             }
         }
+    }
+
+    /**
+     * Start an HTTP server on [port]. Registers /mcp (JSON-RPC POST) and any
+     * tool routes declared with route { method, path }. Blocks until the process exits.
+     */
+    fun serveHttp(port: Int = config.port) {
+        val server = HttpServer.create(InetSocketAddress(port), 0)
+
+        server.createContext("/mcp") { exchange ->
+            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                writeCors(exchange); return@createContext
+            }
+            if (!exchange.requestMethod.equals("POST", ignoreCase = true)) {
+                httpJson(exchange, """{"error":"Method not allowed"}""", 405); return@createContext
+            }
+            setCors(exchange)
+            val body = exchange.requestBody.readBytes()
+            val request = try {
+                json.parseToJsonElement(String(body)).jsonObject
+            } catch (_: Exception) {
+                httpJson(exchange, """{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"}}""", 200)
+                return@createContext
+            }
+            val response = runBlocking { handleRequest(request) }
+            val responseStr = if (response != null) json.encodeToString(JsonObject.serializer(), response)
+                              else """{"jsonrpc":"2.0","result":{}}"""
+            httpJson(exchange, responseStr, 200)
+        }
+
+        server.createContext("/") { exchange ->
+            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                writeCors(exchange); return@createContext
+            }
+            setCors(exchange)
+            if (!handleToolRoute(exchange)) {
+                httpJson(exchange, """{"error":"Not found"}""", 404)
+            }
+        }
+
+        server.executor = null
+        server.start()
+        System.err.println("[zeromcp] http transport ready on port $port")
+        Thread.currentThread().join()
+    }
+
+    private fun handleToolRoute(exchange: HttpExchange): Boolean {
+        val method = exchange.requestMethod.uppercase()
+        val urlPath = exchange.requestURI.path
+
+        for ((_, tool) in tools) {
+            val route = tool.route ?: continue
+            if (route.method != method) continue
+            val pathParams = matchRoutePath(route.path, urlPath) ?: continue
+
+            val args = mutableMapOf<String, Any?>()
+            args.putAll(pathParams)
+
+            if (method == "GET") {
+                val query = exchange.requestURI.query ?: ""
+                for (pair in query.split("&")) {
+                    if (pair.isBlank()) continue
+                    val idx = pair.indexOf('=')
+                    if (idx > 0) args[pair.substring(0, idx)] = pair.substring(idx + 1)
+                }
+            } else {
+                val body = exchange.requestBody.readBytes()
+                if (body.isNotEmpty()) {
+                    try {
+                        val bodyObj = json.parseToJsonElement(String(body)).jsonObject
+                        args.putAll(bodyObj.toArgMap())
+                    } catch (_: Exception) { /* ignore malformed body */ }
+                }
+            }
+
+            val result = try {
+                runBlocking { tool.execute(args, Ctx(toolName = tool.name, permissions = tool.permissions)) }
+            } catch (e: Exception) {
+                val err = e.message?.replace("\"", "\\\"") ?: "error"
+                httpJson(exchange, """{"ok":false,"error":"$err"}""", 500)
+                return true
+            }
+            val resultJson = json.encodeToString(JsonElement.serializer(), toJsonElement(result))
+            httpJson(exchange, """{"ok":true,"result":$resultJson}""", 200)
+            return true
+        }
+        return false
     }
 
     /**
@@ -436,6 +526,44 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
             buildErrorResponse(id, -32603, "Error rendering prompt: ${e.message}")
         }
     }
+}
+
+// --- HTTP helpers ---
+
+private fun setCors(exchange: HttpExchange) {
+    exchange.responseHeaders.set("Access-Control-Allow-Origin", "*")
+    exchange.responseHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    exchange.responseHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+}
+
+private fun writeCors(exchange: HttpExchange) {
+    setCors(exchange)
+    exchange.sendResponseHeaders(204, -1)
+}
+
+private fun httpJson(exchange: HttpExchange, body: String, status: Int) {
+    val bytes = body.toByteArray()
+    exchange.responseHeaders.set("Content-Type", "application/json")
+    exchange.sendResponseHeaders(status, bytes.size.toLong())
+    exchange.responseBody.use { it.write(bytes) }
+}
+
+// --- Route matching ---
+
+private fun matchRoutePath(pattern: String, urlPath: String): Map<String, String>? {
+    val patternParts = pattern.trim('/').split("/")
+    val pathParts = urlPath.trim('/').split("/")
+    if (patternParts.size != pathParts.size) return null
+    val params = mutableMapOf<String, String>()
+    for (i in patternParts.indices) {
+        val pp = patternParts[i]
+        if (pp.startsWith(":")) {
+            params[pp.substring(1)] = pathParts[i]
+        } else if (pp != pathParts[i]) {
+            return null
+        }
+    }
+    return params
 }
 
 // --- Pagination (base64 cursor) ---

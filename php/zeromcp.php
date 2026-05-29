@@ -25,8 +25,8 @@ for ($i = 1; $i < count($argv); $i++) {
 $command = $filteredArgs[0] ?? null;
 $toolsDir = $filteredArgs[1] ?? null;
 
-if ($command !== 'serve') {
-    fwrite(STDERR, "Usage: zeromcp serve [tools-directory] [--config <path>]\n");
+if ($command !== 'serve' && $command !== 'http') {
+    fwrite(STDERR, "Usage: zeromcp serve|http [tools-directory] [--config <path>]\n");
     exit(1);
 }
 
@@ -41,4 +41,8 @@ if ($configPath) {
 }
 
 $server = new ZeroMcp\Server($config);
-$server->serve();
+if ($command === 'http') {
+    $server->serveHttp();
+} else {
+    $server->serve();
+}

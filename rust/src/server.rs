@@ -84,6 +84,7 @@ impl Server {
                 permissions: Permissions::default(),
                 execute: Box::new(handler),
                 cached_schema,
+                route: None,
             },
         );
     }

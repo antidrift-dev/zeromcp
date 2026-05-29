@@ -14,6 +14,7 @@ type PluginTool struct {
 	Description string
 	Input       Input
 	Permissions *Permissions
+	Route       *RouteConfig
 	Execute     func(args map[string]any, ctx *Ctx) (any, error)
 }
 
@@ -116,6 +117,7 @@ func (s *Scanner) loadPlugin(path, rootDir string) {
 		Description: pt.Description,
 		Input:       pt.Input,
 		Permissions: pt.Permissions,
+		Route:       pt.Route,
 		Execute:     pt.Execute,
 	}
 

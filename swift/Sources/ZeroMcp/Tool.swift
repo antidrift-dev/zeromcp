@@ -43,23 +43,36 @@ public struct ToolContext {
     }
 }
 
+public struct RouteDefinition {
+    public let method: String
+    public let path: String
+
+    public init(method: String, path: String) {
+        self.method = method.uppercased()
+        self.path = path
+    }
+}
+
 public struct ToolDefinition {
     public let description: String
     public let input: InputSchema
     public let cachedSchema: JsonSchema
     public let permissions: Permissions
+    public let route: RouteDefinition?
     public let execute: ([String: Any], ToolContext) async throws -> Any
 
     public init(
         description: String,
         input: InputSchema = [:],
         permissions: Permissions = Permissions(),
+        route: RouteDefinition? = nil,
         execute: @escaping ([String: Any], ToolContext) async throws -> Any
     ) {
         self.description = description
         self.input = input
         self.cachedSchema = toJsonSchema(input)
         self.permissions = permissions
+        self.route = route
         self.execute = execute
     }
 }
@@ -68,9 +81,11 @@ public struct ToolDefinition {
 public struct ToolBuilder {
     public let description: String
     public let input: InputSchema
+    public let route: RouteDefinition?
 
-    public init(description: String, input: InputSchema = [:]) {
+    public init(description: String, input: InputSchema = [:], route: RouteDefinition? = nil) {
         self.description = description
         self.input = input
+        self.route = route
     }
 }

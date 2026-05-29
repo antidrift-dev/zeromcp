@@ -18,6 +18,7 @@ async fn main() {
                 })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 
@@ -37,6 +38,7 @@ async fn main() {
                 })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 

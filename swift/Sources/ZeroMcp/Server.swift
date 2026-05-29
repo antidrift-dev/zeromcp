@@ -6,7 +6,7 @@ import Glibc
 #endif
 
 public class ZeroMcp {
-    private var tools: [String: ToolDefinition] = [:]
+    var tools: [String: ToolDefinition] = [:]
     private var resources: [String: ResourceDefinition] = [:]
     private var templates: [String: ResourceTemplateDefinition] = [:]
     private var prompts: [String: PromptDefinition] = [:]
@@ -32,12 +32,14 @@ public class ZeroMcp {
         description: String,
         input: InputSchema = [:],
         permissions: Permissions = Permissions(),
+        route: RouteDefinition? = nil,
         execute: @escaping ([String: Any], ToolContext) async throws -> Any
     ) {
         tools[name] = ToolDefinition(
             description: description,
             input: input,
             permissions: permissions,
+            route: route,
             execute: execute
         )
     }
@@ -52,6 +54,7 @@ public class ZeroMcp {
         tools[name] = ToolDefinition(
             description: b.description,
             input: b.input,
+            route: b.route,
             execute: execute
         )
     }

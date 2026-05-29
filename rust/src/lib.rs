@@ -19,6 +19,7 @@
 //!             Ok(Value::String(format!("Hello, {name}!")))
 //!         })),
 //!         cached_schema: Default::default(),
+//!         route: None,
 //!     });
 //!
 //!     server.serve().await;
@@ -36,7 +37,7 @@ pub use config::Config;
 pub use schema::Input;
 pub use server::Server;
 pub use types::{
-    BoxFuture, Ctx, ExecuteFn, Permissions, Tool, ToolResult,
+    BoxFuture, Ctx, ExecuteFn, Permissions, RouteConfig, Tool, ToolResult,
     // v0.2.0: resources
     ReadFn, ReadFuture, Resource, ResourceTemplate, TemplateReadFn,
     // v0.2.0: prompts

@@ -114,13 +114,17 @@ class ToolScanner:
             return await raw_execute(args, _ctx)
 
         input_schema = tool_meta.get("input", {})
-        self.tools[name] = {
+        entry: dict = {
             "description": tool_meta.get("description", ""),
             "input": input_schema,
             "_cached_schema": to_json_schema(input_schema),
             "permissions": tool_meta.get("permissions"),
             "execute": wrapped_execute,
         }
+        route = tool_meta.get("route")
+        if route and isinstance(route, dict) and "method" in route and "path" in route:
+            entry["route"] = {"method": route["method"].upper(), "path": route["path"]}
+        self.tools[name] = entry
 
         _log(f"Loaded: {name}")
 

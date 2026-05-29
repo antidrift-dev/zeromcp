@@ -142,12 +142,15 @@ class Scanner
             $permissions = $toolDef['permissions'] ?? [];
             $this->logPermissions($name, $permissions);
 
+            $route = isset($toolDef['route']) && is_array($toolDef['route']) ? $toolDef['route'] : null;
+
             $this->tools[$name] = new Tool(
                 name: $name,
                 description: $toolDef['description'] ?? '',
                 input: $toolDef['input'] ?? [],
                 permissions: $permissions,
-                execute: $toolDef['execute']
+                execute: $toolDef['execute'],
+                route: $route
             );
 
             fwrite(STDERR, "[zeromcp] Loaded: $name\n");

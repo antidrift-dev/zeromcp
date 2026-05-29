@@ -20,8 +20,12 @@ public record Tool(
     String description,
     List<Input> inputs,
     Permissions permissions,
-    ToolExecutor executor
+    ToolExecutor executor,
+    Route route
 ) {
+    /** HTTP route for this tool. Optional — null means stdio only. */
+    public record Route(String method, String path) {}
+
     public static Builder builder() {
         return new Builder();
     }
@@ -31,6 +35,7 @@ public record Tool(
         private final List<Input> inputs = new ArrayList<>();
         private Permissions permissions = Permissions.of();
         private ToolExecutor executor;
+        private Route route = null;
 
         public Builder description(String description) {
             this.description = description;
@@ -52,11 +57,16 @@ public record Tool(
             return this;
         }
 
+        public Builder route(String method, String path) {
+            this.route = new Route(method.toUpperCase(), path);
+            return this;
+        }
+
         public Tool build() {
             if (executor == null) {
                 throw new IllegalStateException("Tool must have an execute function");
             }
-            return new Tool(description, List.copyOf(inputs), permissions, executor);
+            return new Tool(description, List.copyOf(inputs), permissions, executor, route);
         }
     }
 }

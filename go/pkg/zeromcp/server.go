@@ -20,11 +20,18 @@ import (
 const version = "0.2.0"
 const protocolVersion = "2024-11-05"
 
+// RouteConfig defines an optional HTTP route for a tool.
+type RouteConfig struct {
+	Method string // GET, POST, PUT, PATCH, DELETE
+	Path   string // e.g. "/:domain/leads"
+}
+
 // Tool defines an MCP tool with its schema, permissions, and execute function.
 type Tool struct {
 	Description string
 	Input       Input
 	Permissions *Permissions
+	Route       *RouteConfig
 	Execute     func(args map[string]any, ctx *Ctx) (any, error)
 }
 
@@ -360,6 +367,12 @@ func (s *Server) serveHTTP(port int, authConfig string) {
 			return
 		}
 		setCORS(w)
+
+		// Route-based tool dispatch
+		if handled := s.handleToolRoute(w, r); handled {
+			return
+		}
+
 		httpJSON(w, map[string]any{
 			"error": "Not found",
 			"endpoints": map[string]string{
@@ -857,6 +870,84 @@ func (s *Server) callTool(params map[string]any) map[string]any {
 	return map[string]any{
 		"content": []map[string]any{{"type": "text", "text": text}},
 	}
+}
+
+// --- Route dispatch ---
+
+// handleToolRoute checks if the incoming request matches any registered tool route.
+// Returns true if the request was handled (even on error), false if no route matched.
+func (s *Server) handleToolRoute(w http.ResponseWriter, r *http.Request) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for name, rt := range s.tools {
+		if rt.tool.Route == nil {
+			continue
+		}
+		route := rt.tool.Route
+		if !strings.EqualFold(route.Method, r.Method) {
+			continue
+		}
+		pathParams := matchRoutePath(route.Path, r.URL.Path)
+		if pathParams == nil {
+			continue
+		}
+
+		// Build args from path params + query/body
+		args := make(map[string]any)
+		for k, v := range pathParams {
+			args[k] = v
+		}
+
+		if strings.EqualFold(r.Method, "GET") {
+			for k, vals := range r.URL.Query() {
+				if len(vals) > 0 {
+					args[k] = vals[0]
+				}
+			}
+		} else {
+			body, err := readBody(r.Body)
+			if err == nil && len(body) > 0 {
+				var bodyMap map[string]any
+				if json.Unmarshal(body, &bodyMap) == nil {
+					for k, v := range bodyMap {
+						args[k] = v
+					}
+				}
+			}
+		}
+
+		result, err := rt.tool.Execute(args, rt.ctx)
+		_ = name
+		if err != nil {
+			httpJSON(w, map[string]any{"ok": false, "error": err.Error()}, 500)
+			return true
+		}
+		httpJSON(w, map[string]any{"ok": true, "result": result}, 200)
+		return true
+	}
+
+	return false
+}
+
+// matchRoutePath matches a URL path against a route pattern with :param segments.
+// Returns a map of param names to values, or nil if the path does not match.
+func matchRoutePath(pattern, urlPath string) map[string]string {
+	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
+	pathParts := strings.Split(strings.Trim(urlPath, "/"), "/")
+	if len(patternParts) != len(pathParts) {
+		return nil
+	}
+
+	params := make(map[string]string)
+	for i, pp := range patternParts {
+		if strings.HasPrefix(pp, ":") {
+			params[pp[1:]] = pathParts[i]
+		} else if pp != pathParts[i] {
+			return nil
+		}
+	}
+	return params
 }
 
 // --- Utilities ---

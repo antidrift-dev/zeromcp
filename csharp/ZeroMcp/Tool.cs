@@ -17,11 +17,18 @@ public class ToolContext
     public Permissions? Permissions { get; set; }
 }
 
+public class ToolRoute
+{
+    public string Method { get; set; } = "GET";
+    public string Path { get; set; } = "";
+}
+
 public class ToolDefinition
 {
     public string Description { get; set; } = "";
     public Dictionary<string, InputField> Input { get; set; } = new();
     public Permissions? Permissions { get; set; }
+    public ToolRoute? Route { get; set; }
     public Func<Dictionary<string, JsonElement>, ToolContext, Task<object>>? Execute { get; set; }
 
     /// <summary>Cached JSON schema, computed once at registration time.</summary>

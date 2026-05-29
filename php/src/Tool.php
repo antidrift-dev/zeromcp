@@ -12,13 +12,16 @@ class Tool
     public $execute;
     /** Pre-computed JSON Schema for $input, set at load time. */
     public array $cachedSchema;
+    /** Optional HTTP route: ['method' => 'GET'|'POST'|..., 'path' => '/:param/...'] */
+    public ?array $route;
 
     public function __construct(
         string $name,
         string $description = '',
         array $input = [],
         array $permissions = [],
-        ?callable $execute = null
+        ?callable $execute = null,
+        ?array $route = null
     ) {
         $this->name = $name;
         $this->description = $description;
@@ -26,6 +29,7 @@ class Tool
         $this->permissions = $permissions;
         $this->execute = $execute;
         $this->cachedSchema = Schema::toJsonSchema($input);
+        $this->route = $route;
     }
 
     public function call(array $args, ?Context $ctx = null): mixed

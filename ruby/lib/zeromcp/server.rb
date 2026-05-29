@@ -3,6 +3,7 @@
 require 'json'
 require 'base64'
 require 'timeout'
+require 'webrick'
 require_relative 'schema'
 require_relative 'config'
 require_relative 'tool'
@@ -24,6 +25,45 @@ module ZeroMcp
       @log_level = 'info'
       @icon = nil
       @credential_cache = {}
+    end
+
+    # Start an HTTP server that exposes:
+    #   POST /mcp  — JSON-RPC over HTTP
+    #   <method> <path> — per-tool route handlers (tools with a `route:` field)
+    #
+    # Usage: ZeroMcp::Server.new.serve_http(port: 3000)
+    def serve_http(port: 3000)
+      load_tools
+
+      http = WEBrick::HTTPServer.new(Port: port, Logger: WEBrick::Log.new($stderr), AccessLog: [])
+      $stderr.puts "[zeromcp] HTTP server listening on port #{port}"
+
+      # /mcp — JSON-RPC endpoint
+      http.mount_proc('/mcp') do |req, res|
+        begin
+          request = JSON.parse(req.body || '{}')
+        rescue JSON::ParserError
+          res.status = 400
+          res.content_type = 'application/json'
+          res.body = JSON.generate({ 'error' => 'Invalid JSON' })
+          next
+        end
+        response = handle_request(request)
+        res.content_type = 'application/json'
+        res.body = JSON.generate(response || {})
+      end
+
+      # Register per-tool HTTP routes
+      @tools.each do |_name, tool|
+        next unless tool.route.is_a?(Hash)
+        route_method = (tool.route[:method] || tool.route['method'] || 'POST').upcase
+        route_path   = tool.route[:path]   || tool.route['path']   || '/'
+        register_tool_route(http, tool, route_method, route_path)
+      end
+
+      trap('INT')  { http.shutdown }
+      trap('TERM') { http.shutdown }
+      http.start
     end
 
     # Load tools (and resources/prompts) from the configured directories.
@@ -472,6 +512,71 @@ module ZeroMcp
         begin; return JSON.parse(val); rescue; return val; end
       end
       nil
+    end
+
+    # --- HTTP route helpers ---
+
+    def register_tool_route(http, tool, route_method, route_path)
+      # Convert :param segments to a regex for matching
+      param_names = []
+      regex_str = route_path.gsub(/:([A-Za-z_][A-Za-z0-9_]*)/) do
+        param_names << $1
+        '([^/]+)'
+      end
+      route_regex = /\A#{regex_str}\z/
+
+      http.mount_proc(route_path_prefix(route_path)) do |req, res|
+        next unless req.request_method == route_method
+
+        path_params = extract_path_params(req.path, route_regex, param_names)
+        unless path_params
+          res.status = 404
+          res.content_type = 'application/json'
+          res.body = JSON.generate({ 'ok' => false, 'error' => 'Not found' })
+          next
+        end
+
+        args = if route_method == 'GET'
+          query_args = WEBrick::HTTPUtils.parse_query(req.query_string || '')
+          query_args.merge(path_params)
+        else
+          body_args = begin
+            req.body && !req.body.empty? ? JSON.parse(req.body) : {}
+          rescue JSON::ParserError
+            {}
+          end
+          body_args.merge(path_params)
+        end
+
+        begin
+          ctx = Context.new(tool_name: tool.name, permissions: tool.permissions,
+                            bypass: @config.bypass_permissions,
+                            credentials: _resolve_credentials(tool.name))
+          timeout_secs = (tool.permissions.is_a?(Hash) && tool.permissions[:execute_timeout]) ||
+                         (tool.permissions.is_a?(Hash) && tool.permissions['execute_timeout']) ||
+                         @config.execute_timeout
+          result = Timeout.timeout(timeout_secs) { tool.call(args, ctx) }
+          res.content_type = 'application/json'
+          res.body = JSON.generate({ 'ok' => true, 'result' => result })
+        rescue => e
+          res.status = 500
+          res.content_type = 'application/json'
+          res.body = JSON.generate({ 'ok' => false, 'error' => e.message })
+        end
+      end
+    end
+
+    def route_path_prefix(route_path)
+      # WEBrick mounts on a fixed prefix; use the static prefix before first :param
+      route_path.split('/:').first || '/'
+    end
+
+    def extract_path_params(path, route_regex, param_names)
+      m = path.match(route_regex)
+      return nil unless m
+      result = {}
+      param_names.each_with_index { |name, i| result[name] = m[i + 1] }
+      result
     end
   end
 end

@@ -4,13 +4,14 @@ require_relative 'schema'
 
 module ZeroMcp
   class Tool
-    attr_reader :name, :description, :input, :permissions, :execute_block, :cached_schema
+    attr_reader :name, :description, :input, :permissions, :execute_block, :cached_schema, :route
 
-    def initialize(name:, description: '', input: {}, permissions: {}, &block)
+    def initialize(name:, description: '', input: {}, permissions: {}, route: nil, &block)
       @name = name
       @description = description
       @input = input
       @permissions = permissions
+      @route = route
       @execute_block = block
       @cached_schema = Schema.to_json_schema(@input)
     end

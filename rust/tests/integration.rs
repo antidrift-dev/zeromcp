@@ -17,6 +17,7 @@ fn make_server() -> Server {
                 })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 
@@ -36,6 +37,7 @@ fn make_server() -> Server {
                 })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 
@@ -49,6 +51,7 @@ fn make_server() -> Server {
                 Box::pin(async move { Err("something went wrong".to_string()) })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 
@@ -150,6 +153,7 @@ async fn tool_execute_success() {
             })
         }),
         cached_schema: Default::default(),
+        route: None,
     };
 
     let ctx = Ctx::default();
@@ -168,6 +172,7 @@ async fn tool_execute_failure() {
             Box::pin(async move { Err("boom".to_string()) })
         }),
         cached_schema: Default::default(),
+        route: None,
     };
 
     let ctx = Ctx::default();

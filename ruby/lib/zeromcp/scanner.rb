@@ -57,7 +57,8 @@ module ZeroMcp
         name: name,
         description: tool_def[:description] || '',
         input: tool_def[:input] || {},
-        permissions: tool_def[:permissions] || {}
+        permissions: tool_def[:permissions] || {},
+        route: tool_def[:route]
       ) { |args, ctx| tool_def[:execute].call(args, ctx) }
 
       $stderr.puts "[zeromcp] Loaded: #{name}"
@@ -103,10 +104,11 @@ module ZeroMcp
       @definition = {}
     end
 
-    def tool(description: '', permissions: {}, input: {})
+    def tool(description: '', permissions: {}, input: {}, route: nil)
       @definition[:description] = description
       @definition[:permissions] = permissions
       @definition[:input] = input
+      @definition[:route] = route
     end
 
     def execute(&block)

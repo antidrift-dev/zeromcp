@@ -17,6 +17,7 @@ export interface ToolDefinition {
   cachedSchema: JsonSchema;
   execute: (args: Record<string, unknown>, ctx?: ToolContext) => Promise<unknown>;
   execute_timeout?: number; // ms, per-tool override
+  route?: { method: string; path: string };
 }
 
 export class ToolScanner {
@@ -134,6 +135,7 @@ export class ToolScanner {
         input?: InputSchema;
         permissions?: ToolPermissions;
         execute?: Function;
+        route?: { method: string; path: string };
       };
 
       if (!tool || !tool.execute || typeof tool.execute !== 'function') {
@@ -161,6 +163,7 @@ export class ToolScanner {
           return rawExecute(args, ctx);
         },
         execute_timeout: tool.permissions?.execute_timeout,
+        route: tool.route,
       });
 
       console.error(`[zeromcp] Loaded: ${name}`);

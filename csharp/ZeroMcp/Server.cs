@@ -40,13 +40,15 @@ public class ZeroMcpServer
         string name,
         string description,
         Dictionary<string, InputField>? input = null,
-        Func<Dictionary<string, JsonElement>, ToolContext, Task<object>>? execute = null)
+        Func<Dictionary<string, JsonElement>, ToolContext, Task<object>>? execute = null,
+        ToolRoute? route = null)
     {
         var def = new ToolDefinition
         {
             Description = description,
             Input = input ?? new(),
-            Execute = execute
+            Execute = execute,
+            Route = route
         };
         def.CachedSchema = Schema.ToJsonSchema(def.Input);
         _tools[name] = def;
@@ -151,6 +153,162 @@ public class ZeroMcpServer
                 Console.Out.Flush();
             }
         }
+    }
+
+    /// <summary>
+    /// Start an HTTP server that exposes route-based endpoints for tools with a Route defined,
+    /// plus a /mcp POST endpoint for raw JSON-RPC requests.
+    /// </summary>
+    public async Task ServeHttp(int port = 3000)
+    {
+        var prefix = $"http://+:{port}/";
+        var listener = new System.Net.HttpListener();
+        listener.Prefixes.Add(prefix);
+        listener.Start();
+        Console.Error.WriteLine($"[zeromcp] HTTP server listening on port {port}");
+
+        while (true)
+        {
+            var ctx = await listener.GetContextAsync();
+            _ = HandleHttpContext(ctx);
+        }
+    }
+
+    private async Task HandleHttpContext(System.Net.HttpListenerContext ctx)
+    {
+        var req = ctx.Request;
+        var res = ctx.Response;
+        res.ContentType = "application/json";
+
+        try
+        {
+            var method = req.HttpMethod.ToUpperInvariant();
+            var rawPath = req.Url?.AbsolutePath ?? "/";
+
+            // /mcp — raw JSON-RPC passthrough
+            if (rawPath == "/mcp" && method == "POST")
+            {
+                using var sr = new StreamReader(req.InputStream);
+                var body = await sr.ReadToEndAsync();
+                var doc = JsonDocument.Parse(body);
+                var rpcResponse = await HandleRequest(doc);
+                var json = rpcResponse != null
+                    ? JsonSerializer.Serialize(rpcResponse, JsonOptions)
+                    : "{}";
+                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                res.StatusCode = 200;
+                await res.OutputStream.WriteAsync(bytes);
+                res.OutputStream.Close();
+                return;
+            }
+
+            // Route-based tool dispatch
+            foreach (var (name, tool) in _tools)
+            {
+                if (tool.Route == null) continue;
+                if (!string.Equals(tool.Route.Method, method, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var pathParams = MatchRoutePath(tool.Route.Path, rawPath);
+                if (pathParams == null) continue;
+
+                var args = new Dictionary<string, JsonElement>();
+
+                // Merge path params
+                foreach (var (k, v) in pathParams)
+                    args[k] = JsonDocument.Parse(JsonSerializer.Serialize(v)).RootElement.Clone();
+
+                if (method == "GET")
+                {
+                    // Merge query params
+                    foreach (string? key in req.QueryString.Keys)
+                    {
+                        if (key == null) continue;
+                        var val = req.QueryString[key] ?? "";
+                        args[key] = JsonDocument.Parse(JsonSerializer.Serialize(val)).RootElement.Clone();
+                    }
+                }
+                else
+                {
+                    // Merge JSON body
+                    using var sr = new StreamReader(req.InputStream);
+                    var body = await sr.ReadToEndAsync();
+                    if (!string.IsNullOrWhiteSpace(body))
+                    {
+                        try
+                        {
+                            var bodyDoc = JsonDocument.Parse(body);
+                            if (bodyDoc.RootElement.ValueKind == JsonValueKind.Object)
+                            {
+                                foreach (var prop in bodyDoc.RootElement.EnumerateObject())
+                                    args[prop.Name] = prop.Value.Clone();
+                            }
+                        }
+                        catch { /* ignore malformed body */ }
+                    }
+                }
+
+                try
+                {
+                    var toolCtx = new ToolContext { ToolName = name, Permissions = tool.Permissions };
+                    var result = await tool.Execute!(args, toolCtx);
+                    var json = JsonSerializer.Serialize(new { ok = true, result }, JsonOptions);
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                    res.StatusCode = 200;
+                    await res.OutputStream.WriteAsync(bytes);
+                }
+                catch (Exception ex)
+                {
+                    var json = JsonSerializer.Serialize(new { ok = false, error = ex.Message }, JsonOptions);
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                    res.StatusCode = 500;
+                    await res.OutputStream.WriteAsync(bytes);
+                }
+
+                res.OutputStream.Close();
+                return;
+            }
+
+            // No match
+            var notFound = System.Text.Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"Not found\"}");
+            res.StatusCode = 404;
+            await res.OutputStream.WriteAsync(notFound);
+            res.OutputStream.Close();
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                var errBytes = System.Text.Encoding.UTF8.GetBytes(
+                    JsonSerializer.Serialize(new { ok = false, error = ex.Message }));
+                res.StatusCode = 500;
+                await res.OutputStream.WriteAsync(errBytes);
+                res.OutputStream.Close();
+            }
+            catch { /* socket already closed */ }
+        }
+    }
+
+    /// <summary>
+    /// Match a route pattern with :param segments against an incoming path.
+    /// Returns captured parameters or null if no match.
+    /// </summary>
+    private static Dictionary<string, string>? MatchRoutePath(string pattern, string path)
+    {
+        var patternSegments = pattern.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var pathSegments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (patternSegments.Length != pathSegments.Length) return null;
+
+        var captured = new Dictionary<string, string>();
+        for (var i = 0; i < patternSegments.Length; i++)
+        {
+            if (patternSegments[i].StartsWith(':'))
+                captured[patternSegments[i][1..]] = pathSegments[i];
+            else if (!string.Equals(patternSegments[i], pathSegments[i], StringComparison.OrdinalIgnoreCase))
+                return null;
+        }
+
+        return captured;
     }
 
     /// <summary>

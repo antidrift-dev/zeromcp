@@ -1,9 +1,14 @@
 package io.antidrift.zeromcp;
 
 import com.google.gson.*;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -94,6 +99,151 @@ public class ZeroMcp {
      */
     public void prompt(String name, PromptDef prompt) {
         prompts.put(name, new NamedPrompt(name, prompt));
+    }
+
+    /**
+     * Start an HTTP server that exposes route-annotated tools as REST endpoints.
+     * The /mcp endpoint handles standard JSON-RPC (POST body). Route-annotated tools
+     * are also mounted at their configured paths. Blocks until the current thread is
+     * interrupted.
+     *
+     * @param port TCP port to listen on (0 = use config port)
+     */
+    public void serveHttp(int port) throws IOException {
+        int listenPort = port > 0 ? port : config.port();
+        var server = HttpServer.create(new InetSocketAddress(listenPort), 0);
+
+        // /mcp — standard JSON-RPC over HTTP POST
+        server.createContext("/mcp", exchange -> {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            try {
+                var body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                var request = JsonParser.parseString(body).getAsJsonObject();
+                var response = handleRequest(request);
+                var responseJson = response != null ? gson.toJson(response) : "{}";
+                sendHttpResponse(exchange, 200, responseJson);
+            } catch (Exception e) {
+                sendHttpResponse(exchange, 400, "{\"error\":\"Bad Request\"}");
+            }
+        });
+
+        // Register a context for each route-annotated tool
+        for (var entry : tools.entrySet()) {
+            var toolName = entry.getKey();
+            var namedTool = entry.getValue();
+            var route = namedTool.tool().route();
+            if (route == null) continue;
+
+            server.createContext(route.path(), exchange -> {
+                var reqMethod = exchange.getRequestMethod().toUpperCase();
+                if (!reqMethod.equals(route.method())) {
+                    sendHttpResponse(exchange, 405, "{\"ok\":false,\"error\":\"Method Not Allowed\"}");
+                    return;
+                }
+                try {
+                    var args = new LinkedHashMap<String, Object>();
+
+                    // Extract path params by matching URI against route pattern
+                    var pathParams = matchPathParams(route.path(), exchange.getRequestURI().getPath());
+                    args.putAll(pathParams);
+
+                    if ("GET".equals(reqMethod)) {
+                        // Merge query params
+                        var query = exchange.getRequestURI().getRawQuery();
+                        if (query != null) args.putAll(parseQueryString(query));
+                    } else {
+                        // Merge JSON body
+                        var body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        if (!body.isBlank()) {
+                            try {
+                                var bodyJson = JsonParser.parseString(body).getAsJsonObject();
+                                args.putAll(jsonObjectToMap(bodyJson));
+                            } catch (Exception ignored) {}
+                        }
+                    }
+
+                    var ctx = new Ctx(toolName, namedTool.tool().permissions());
+                    var result = namedTool.tool().executor().execute(args, ctx);
+                    var resultStr = result instanceof String s ? s : gson.toJson(result);
+
+                    var resp = new JsonObject();
+                    resp.addProperty("ok", true);
+                    resp.addProperty("result", resultStr);
+                    sendHttpResponse(exchange, 200, gson.toJson(resp));
+                } catch (Exception e) {
+                    var resp = new JsonObject();
+                    resp.addProperty("ok", false);
+                    resp.addProperty("error", e.getMessage() != null ? e.getMessage() : "Internal error");
+                    sendHttpResponse(exchange, 500, gson.toJson(resp));
+                }
+            });
+        }
+
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.start();
+        System.err.println("[zeromcp] HTTP server listening on port " + listenPort);
+
+        // Block until interrupted
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            server.stop(0);
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Start HTTP server on the config port.
+     */
+    public void serveHttp() throws IOException {
+        serveHttp(0);
+    }
+
+    private static void sendHttpResponse(HttpExchange exchange, int status, String body) throws IOException {
+        var bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (var os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
+
+    /**
+     * Match a URL path against a route pattern with :param segments.
+     * Returns a map of captured param names to values.
+     */
+    private static Map<String, Object> matchPathParams(String pattern, String path) {
+        var patternParts = pattern.split("/", -1);
+        var pathParts = path.split("/", -1);
+        var params = new LinkedHashMap<String, Object>();
+        if (patternParts.length != pathParts.length) return params;
+        for (int i = 0; i < patternParts.length; i++) {
+            if (patternParts[i].startsWith(":")) {
+                params.put(patternParts[i].substring(1), URLDecoder.decode(pathParts[i], StandardCharsets.UTF_8));
+            }
+        }
+        return params;
+    }
+
+    /**
+     * Parse a URL query string into a map of string values.
+     */
+    private static Map<String, Object> parseQueryString(String query) {
+        var map = new LinkedHashMap<String, Object>();
+        for (var pair : query.split("&")) {
+            var idx = pair.indexOf('=');
+            if (idx < 0) {
+                map.put(URLDecoder.decode(pair, StandardCharsets.UTF_8), "");
+            } else {
+                var key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8);
+                var val = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+                map.put(key, val);
+            }
+        }
+        return map;
     }
 
     /**

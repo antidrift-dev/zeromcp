@@ -53,6 +53,15 @@ pub type BoxFuture = Pin<Box<dyn Future<Output = ToolResult> + Send>>;
 pub type ExecuteFn =
     Box<dyn Fn(Value, Ctx) -> BoxFuture + Send + Sync>;
 
+/// HTTP route configuration for a tool.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteConfig {
+    /// HTTP method: "GET", "POST", "PUT", "PATCH", "DELETE".
+    pub method: String,
+    /// Path pattern with `:param` segments, e.g. `/:domain/leads`.
+    pub path: String,
+}
+
 /// A registered tool.
 pub struct Tool {
     pub description: String,
@@ -61,6 +70,8 @@ pub struct Tool {
     pub execute: ExecuteFn,
     /// Pre-computed JSON schema, populated at registration time.
     pub cached_schema: crate::schema::JsonSchema,
+    /// Optional HTTP route that maps an HTTP endpoint to this tool.
+    pub route: Option<RouteConfig>,
 }
 
 // ---------------------------------------------------------------------------
