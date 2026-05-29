@@ -5,8 +5,10 @@ use crate::types::{BoxFuture, Ctx, Permissions, Prompt, Resource, ResourceTempla
 use crate::schema::Input;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpListener;
 
 /// The MCP server. Register tools, resources, prompts, then call `serve()`.
 pub struct Server {
@@ -158,6 +160,23 @@ impl Server {
                 }
                 let _ = writer.flush().await;
             }
+        }
+    }
+
+    /// Start an HTTP server on the given address (e.g. `"0.0.0.0:3000"`).
+    /// Handles `/health`, `/mcp` (JSON-RPC over HTTP), `/openapi.json`, and `/docs`.
+    pub async fn serve_http(self, addr: &str) {
+        let listener = TcpListener::bind(addr).await
+            .unwrap_or_else(|e| panic!("[zeromcp] Failed to bind {addr}: {e}"));
+        eprintln!("[zeromcp] HTTP server listening on http://{addr}");
+        let this = Arc::new(self);
+        loop {
+            let (stream, _) = match listener.accept().await {
+                Ok(pair) => pair,
+                Err(e) => { eprintln!("[zeromcp] Accept error: {e}"); continue; }
+            };
+            let server = Arc::clone(&this);
+            tokio::spawn(async move { handle_http_conn(server, stream).await });
         }
     }
 
@@ -584,6 +603,190 @@ impl Server {
             }
         }
     }
+
+    // -----------------------------------------------------------------------
+    // OpenAPI spec generation
+    // -----------------------------------------------------------------------
+
+    /// Build an OpenAPI 3.0 spec from all tools that have a `route` field.
+    pub fn build_openapi(&self) -> Value {
+        let title = &self.config.title;
+        let mut paths: BTreeMap<String, Value> = BTreeMap::new();
+
+        for (name, tool) in &self.tools {
+            let route = match &tool.route {
+                Some(r) => r,
+                None => continue,
+            };
+
+            let method = route.method.to_uppercase();
+            let path = &route.path;
+
+            // Extract :param names from path segments like /:domain/leads
+            let path_params: Vec<String> = path
+                .split('/')
+                .filter(|seg| seg.starts_with(':'))
+                .map(|seg| seg[1..].to_string())
+                .collect();
+
+            // Convert :param to {param} for OpenAPI path format
+            let openapi_path = path
+                .split('/')
+                .map(|seg| {
+                    if seg.starts_with(':') {
+                        format!("{{{}}}", &seg[1..])
+                    } else {
+                        seg.to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("/");
+
+            let schema = &tool.cached_schema;
+            let operation = if method == "GET" {
+                let parameters: Vec<Value> = schema.properties.iter().map(|(pname, prop)| {
+                    let location = if path_params.contains(pname) { "path" } else { "query" };
+                    let required = schema.required.contains(pname) || location == "path";
+                    let mut prop_schema = json!({ "type": prop.prop_type });
+                    if let Some(ref desc) = prop.description {
+                        prop_schema["description"] = json!(desc);
+                    }
+                    json!({
+                        "name": pname,
+                        "in": location,
+                        "required": required,
+                        "schema": prop_schema
+                    })
+                }).collect();
+
+                json!({
+                    "operationId": name,
+                    "description": tool.description,
+                    "parameters": parameters,
+                    "responses": {
+                        "200": { "description": "Success" },
+                        "500": { "description": "Error" }
+                    }
+                })
+            } else {
+                let mut properties = json!({});
+                for (pname, prop) in &schema.properties {
+                    let mut prop_schema = json!({ "type": prop.prop_type });
+                    if let Some(ref desc) = prop.description {
+                        prop_schema["description"] = json!(desc);
+                    }
+                    properties[pname] = prop_schema;
+                }
+                let body_schema = json!({
+                    "type": "object",
+                    "properties": properties,
+                    "required": schema.required
+                });
+
+                json!({
+                    "operationId": name,
+                    "description": tool.description,
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": { "schema": body_schema }
+                        }
+                    },
+                    "responses": {
+                        "200": { "description": "Success" },
+                        "500": { "description": "Error" }
+                    }
+                })
+            };
+
+            let method_key = method.to_lowercase();
+            let entry = paths.entry(openapi_path).or_insert_with(|| json!({}));
+            entry[method_key] = operation;
+        }
+
+        json!({
+            "openapi": "3.0.0",
+            "info": { "title": title, "version": "0.5.0" },
+            "paths": paths
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HTTP connection handler
+// ---------------------------------------------------------------------------
+
+/// Handle a single HTTP/1.1 connection. Reads the request line, routes to the
+/// correct handler, and writes a minimal HTTP response.
+async fn handle_http_conn(server: Arc<Server>, mut stream: tokio::net::TcpStream) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut buf = vec![0u8; 65536];
+    let n = match stream.read(&mut buf).await {
+        Ok(0) | Err(_) => return,
+        Ok(n) => n,
+    };
+
+    let raw = match std::str::from_utf8(&buf[..n]) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
+    // Parse request line
+    let first_line = raw.lines().next().unwrap_or("");
+    let mut parts = first_line.splitn(3, ' ');
+    let method = parts.next().unwrap_or("").to_uppercase();
+    let path_and_query = parts.next().unwrap_or("/");
+    let path = path_and_query.split('?').next().unwrap_or("/");
+
+    let (status, content_type, body) = match (method.as_str(), path) {
+        ("GET", "/health") => {
+            (200, "application/json", "{\"status\":\"ok\"}".to_string())
+        }
+        ("GET", "/openapi.json") => {
+            let spec = server.build_openapi();
+            (200, "application/json", serde_json::to_string(&spec).unwrap_or_default())
+        }
+        ("GET", "/docs") => {
+            let html = "<!DOCTYPE html>\n<html>\n<head>\n  <title>ZeroMCP API</title>\n  <meta charset=\"utf-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist/swagger-ui.css\">\n</head>\n<body>\n<div id=\"swagger-ui\"></div>\n<script src=\"https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js\"></script>\n<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>\n</body>\n</html>".to_string();
+            (200, "text/html", html)
+        }
+        ("POST", "/mcp") => {
+            // Find the body (after the blank line separating headers from body)
+            let body_start = raw.find("\r\n\r\n")
+                .map(|i| i + 4)
+                .or_else(|| raw.find("\n\n").map(|i| i + 2))
+                .unwrap_or(raw.len());
+            let body_str = &raw[body_start..];
+            match serde_json::from_str::<Value>(body_str) {
+                Ok(req) => {
+                    let resp = server.handle_request(&req).await
+                        .unwrap_or_else(|| json!({"jsonrpc":"2.0","result":{}}));
+                    (200, "application/json", serde_json::to_string(&resp).unwrap_or_default())
+                }
+                Err(e) => {
+                    let err = json!({
+                        "jsonrpc": "2.0",
+                        "error": { "code": -32700, "message": format!("Parse error: {e}") }
+                    });
+                    (400, "application/json", serde_json::to_string(&err).unwrap_or_default())
+                }
+            }
+        }
+        _ => {
+            (404, "application/json", "{\"error\":\"Not found\"}".to_string())
+        }
+    };
+
+    let response = format!(
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{body}",
+        status = status,
+        reason = if status == 200 { "OK" } else if status == 400 { "Bad Request" } else { "Not Found" },
+        content_type = content_type,
+        len = body.len(),
+        body = body
+    );
+    let _ = stream.write_all(response.as_bytes()).await;
 }
 
 // ---------------------------------------------------------------------------

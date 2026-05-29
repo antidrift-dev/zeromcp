@@ -15,6 +15,7 @@ class Config
     public bool $cacheCredentials;
     public int $pageSize;
     public ?string $icon;
+    public string $title;
 
     public function __construct(array $opts = [])
     {
@@ -35,6 +36,7 @@ class Config
         $this->cacheCredentials = $opts['cache_credentials'] ?? true;
         $this->pageSize = $opts['page_size'] ?? 0;
         $this->icon = $opts['icon'] ?? null;
+        $this->title = $opts['title'] ?? 'ZeroMCP';
     }
 
     public static function load(?string $path = null): self

@@ -22,6 +22,7 @@ public class Config {
     private String separator = "_";
     private String name = "zeromcp";
     private String version = "0.1.0";
+    private String title = "ZeroMCP";
 
     @SerializedName("execute_timeout")
     private long executeTimeout = 30000; // ms
@@ -38,6 +39,7 @@ public class Config {
     public String separator() { return separator; }
     public String name() { return name; }
     public String version() { return version; }
+    public String title() { return title != null ? title : "ZeroMCP"; }
     public long executeTimeout() { return executeTimeout; }
     public boolean cacheCredentials() { return cacheCredentials; }
 

@@ -324,6 +324,47 @@ func (s *Server) serveHTTP(port int, authConfig string) {
 		httpJSON(w, map[string]any{"status": "ok", "tools": count}, 200)
 	})
 
+	mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			writeCORS(w)
+			return
+		}
+		if r.Method != "GET" {
+			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
+			return
+		}
+		setCORS(w)
+		spec := s.buildOpenAPISpec()
+		httpJSON(w, spec, 200)
+	})
+
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			writeCORS(w)
+			return
+		}
+		if r.Method != "GET" {
+			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(200)
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroMCP API</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+</body>
+</html>`))
+	})
+
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			writeCORS(w)
@@ -928,6 +969,137 @@ func (s *Server) handleToolRoute(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	return false
+}
+
+// buildOpenAPISpec generates an OpenAPI 3.0 spec from all tools that have a Route field.
+func (s *Server) buildOpenAPISpec() map[string]any {
+	title := s.cfg.Title
+	if title == "" {
+		title = "ZeroMCP"
+	}
+
+	paths := map[string]any{}
+
+	s.mu.RLock()
+	names := make([]string, 0, len(s.tools))
+	for name := range s.tools {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		rt := s.tools[name]
+		if rt.tool.Route == nil {
+			continue
+		}
+		route := rt.tool.Route
+		method := strings.ToLower(route.Method)
+
+		// Extract :param names from path
+		pathParamNames := map[string]bool{}
+		openAPIPath := regexp.MustCompile(`:(\w+)`).ReplaceAllStringFunc(route.Path, func(m string) string {
+			paramName := m[1:]
+			pathParamNames[paramName] = true
+			return "{" + paramName + "}"
+		})
+
+		var operation map[string]any
+		if method == "get" {
+			params := []any{}
+			for fieldName, fieldDef := range rt.tool.Input {
+				paramSchema := fieldDefToOpenAPISchema(fieldDef)
+				in := "query"
+				required := true
+				if pathParamNames[fieldName] {
+					in = "path"
+				}
+				if f, ok := fieldDef.(InputField); ok && f.Optional {
+					required = false
+				}
+				param := map[string]any{
+					"name":     fieldName,
+					"in":       in,
+					"required": required,
+					"schema":   paramSchema,
+				}
+				params = append(params, param)
+			}
+			operation = map[string]any{
+				"operationId": name,
+				"description": rt.tool.Description,
+				"parameters":  params,
+				"responses": map[string]any{
+					"200": map[string]any{"description": "Success"},
+					"500": map[string]any{"description": "Error"},
+				},
+			}
+		} else {
+			props := map[string]any{}
+			required := []string{}
+			for fieldName, fieldDef := range rt.tool.Input {
+				props[fieldName] = fieldDefToOpenAPISchema(fieldDef)
+				if f, ok := fieldDef.(InputField); ok && f.Optional {
+					continue
+				}
+				required = append(required, fieldName)
+			}
+			sort.Strings(required)
+			bodySchema := map[string]any{
+				"type":       "object",
+				"properties": props,
+			}
+			if len(required) > 0 {
+				bodySchema["required"] = required
+			}
+			operation = map[string]any{
+				"operationId": name,
+				"description": rt.tool.Description,
+				"requestBody": map[string]any{
+					"required": true,
+					"content": map[string]any{
+						"application/json": map[string]any{
+							"schema": bodySchema,
+						},
+					},
+				},
+				"responses": map[string]any{
+					"200": map[string]any{"description": "Success"},
+					"500": map[string]any{"description": "Error"},
+				},
+			}
+		}
+
+		if _, exists := paths[openAPIPath]; !exists {
+			paths[openAPIPath] = map[string]any{}
+		}
+		paths[openAPIPath].(map[string]any)[method] = operation
+	}
+	s.mu.RUnlock()
+
+	return map[string]any{
+		"openapi": "3.0.0",
+		"info": map[string]any{
+			"title":   title,
+			"version": "0.5.0",
+		},
+		"paths": paths,
+	}
+}
+
+// fieldDefToOpenAPISchema converts an Input field definition to an OpenAPI schema object.
+func fieldDefToOpenAPISchema(fieldDef any) map[string]any {
+	switch v := fieldDef.(type) {
+	case string:
+		return map[string]any{"type": v}
+	case InputField:
+		schema := map[string]any{"type": v.Type}
+		if v.Description != "" {
+			schema["description"] = v.Description
+		}
+		return schema
+	default:
+		return map[string]any{"type": "string"}
+	}
 }
 
 // matchRoutePath matches a URL path against a route pattern with :param segments.

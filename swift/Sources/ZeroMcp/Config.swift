@@ -7,6 +7,7 @@ public struct ZeroMcpConfig: Codable {
     public var bypassPermissions: Bool?
     public var executeTimeout: Double? // seconds, default 30
     public var cacheCredentials: Bool?
+    public var title: String?
 
     enum CodingKeys: String, CodingKey {
         case tools
@@ -15,6 +16,7 @@ public struct ZeroMcpConfig: Codable {
         case bypassPermissions = "bypass_permissions"
         case executeTimeout = "execute_timeout"
         case cacheCredentials = "cache_credentials"
+        case title
     }
 
     public init(
@@ -23,7 +25,8 @@ public struct ZeroMcpConfig: Codable {
         logging: Bool? = nil,
         bypassPermissions: Bool? = nil,
         executeTimeout: Double? = nil,
-        cacheCredentials: Bool? = true
+        cacheCredentials: Bool? = true,
+        title: String? = nil
     ) {
         self.tools = tools
         self.separator = separator
@@ -31,6 +34,7 @@ public struct ZeroMcpConfig: Codable {
         self.bypassPermissions = bypassPermissions
         self.executeTimeout = executeTimeout
         self.cacheCredentials = cacheCredentials
+        self.title = title
     }
 
     public static func load(from path: String? = nil) -> ZeroMcpConfig {

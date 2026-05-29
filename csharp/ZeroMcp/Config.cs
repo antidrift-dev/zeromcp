@@ -23,6 +23,9 @@ public class ZeroMcpConfig
     [JsonPropertyName("cache_credentials")]
     public bool? CacheCredentials { get; set; } = true; // default true
 
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
     public static ZeroMcpConfig Load(string? path = null)
     {
         path ??= Path.Combine(Directory.GetCurrentDirectory(), "zeromcp.config.json");

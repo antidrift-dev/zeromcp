@@ -7,7 +7,7 @@ module ZeroMcp
   class Config
     attr_reader :tools_dir, :resources_dir, :prompts_dir,
                 :separator, :logging, :bypass_permissions, :execute_timeout,
-                :page_size, :icon
+                :page_size, :icon, :title
 
     def initialize(opts = {})
       tools = opts[:tools_dir] || opts['tools'] || './tools'
@@ -28,6 +28,7 @@ module ZeroMcp
       @namespacing = opts[:namespacing] || opts['namespacing'] || {}
       @page_size = opts[:page_size] || opts['page_size'] || 0
       @icon = opts[:icon] || opts['icon']
+      @title = opts[:title] || opts['title'] || 'ZeroMCP'
     end
 
     attr_reader :credentials, :cache_credentials, :namespacing

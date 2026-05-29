@@ -53,6 +53,24 @@ module ZeroMcp
         res.body = JSON.generate(response || {})
       end
 
+      # /openapi.json — auto-generated OpenAPI 3.0 spec from routed tools
+      http.mount_proc('/openapi.json') do |_req, res|
+        res.content_type = 'application/json'
+        res.body = JSON.generate(build_openapi_spec)
+      end
+
+      # /docs — Swagger UI
+      http.mount_proc('/docs') do |_req, res|
+        res.content_type = 'text/html'
+        res.body = SWAGGER_UI_HTML
+      end
+
+      # /health — liveness check
+      http.mount_proc('/health') do |_req, res|
+        res.content_type = 'application/json'
+        res.body = JSON.generate({ 'ok' => true })
+      end
+
       # Register per-tool HTTP routes
       @tools.each do |_name, tool|
         next unless tool.route.is_a?(Hash)
@@ -578,5 +596,123 @@ module ZeroMcp
       param_names.each_with_index { |name, i| result[name] = m[i + 1] }
       result
     end
+
+    # --- OpenAPI spec builder ---
+
+    def build_openapi_spec
+      paths = {}
+
+      @tools.each do |_name, tool|
+        next unless tool.route.is_a?(Hash)
+
+        route_method = (tool.route[:method] || tool.route['method'] || 'POST').upcase
+        route_path   = tool.route[:path]   || tool.route['path']   || '/'
+
+        # Extract :param names from path, convert to {param} for OpenAPI
+        path_param_names = route_path.scan(/:([A-Za-z_][A-Za-z0-9_]*)/).flatten
+        openapi_path = route_path.gsub(/:([A-Za-z_][A-Za-z0-9_]*)/, '{\1}')
+
+        input = tool.input || {}
+        operation = {
+          'operationId' => tool.name,
+          'description' => tool.description || '',
+          'responses'   => {
+            '200' => { 'description' => 'Success' },
+            '500' => { 'description' => 'Error' }
+          }
+        }
+
+        if route_method == 'GET'
+          operation['parameters'] = build_openapi_parameters(input, path_param_names)
+        else
+          operation['requestBody'] = build_openapi_request_body(input)
+        end
+
+        paths[openapi_path] ||= {}
+        paths[openapi_path][route_method.downcase] = operation
+      end
+
+      {
+        'openapi' => '3.0.0',
+        'info'    => { 'title' => @config.title, 'version' => '0.5.0' },
+        'paths'   => paths
+      }
+    end
+
+    def build_openapi_parameters(input, path_param_names)
+      params = []
+
+      # Path params first (preserve order from path)
+      path_param_names.each do |name|
+        spec = input_field_to_openapi_schema(input[name] || input[name.to_sym])
+        params << {
+          'name'     => name,
+          'in'       => 'path',
+          'required' => true,
+          'schema'   => spec
+        }
+      end
+
+      # Remaining fields as query params
+      input.each do |key, value|
+        key_s = key.to_s
+        next if path_param_names.include?(key_s)
+
+        spec     = input_field_to_openapi_schema(value)
+        optional = value.is_a?(Hash) && (value[:optional] || value['optional'])
+        params << {
+          'name'     => key_s,
+          'in'       => 'query',
+          'required' => !optional,
+          'schema'   => spec
+        }
+      end
+
+      params
+    end
+
+    def build_openapi_request_body(input)
+      schema = Schema.to_json_schema(input)
+      {
+        'required' => true,
+        'content'  => {
+          'application/json' => { 'schema' => schema }
+        }
+      }
+    end
+
+    def input_field_to_openapi_schema(value)
+      return { 'type' => 'string' } if value.nil?
+
+      if value.is_a?(String)
+        Schema::TYPE_MAP[value] || { 'type' => 'string' }
+      elsif value.is_a?(Hash)
+        type = value[:type] || value['type']
+        mapped = Schema::TYPE_MAP[type.to_s] || { 'type' => 'string' }
+        spec = mapped.dup
+        desc = value[:description] || value['description']
+        spec['description'] = desc if desc
+        spec
+      else
+        { 'type' => 'string' }
+      end
+    end
+
+    SWAGGER_UI_HTML = <<~HTML.freeze
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>ZeroMCP API</title>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+      </head>
+      <body>
+      <div id="swagger-ui"></div>
+      <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+      <script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+      </body>
+      </html>
+    HTML
   end
 end

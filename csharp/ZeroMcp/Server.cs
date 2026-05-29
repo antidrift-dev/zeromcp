@@ -202,6 +202,49 @@ public class ZeroMcpServer
                 return;
             }
 
+            // /openapi.json — auto-generated OpenAPI 3.0 spec
+            if (rawPath == "/openapi.json" && method == "GET")
+            {
+                res.ContentType = "application/json";
+                var spec = BuildOpenApiSpec();
+                var json = JsonSerializer.Serialize(spec, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    WriteIndented = true
+                });
+                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                res.StatusCode = 200;
+                await res.OutputStream.WriteAsync(bytes);
+                res.OutputStream.Close();
+                return;
+            }
+
+            // /docs — Swagger UI
+            if (rawPath == "/docs" && method == "GET")
+            {
+                res.ContentType = "text/html";
+                var html = @"<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroMCP API</title>
+  <meta charset=""utf-8""/>
+  <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+  <link rel=""stylesheet"" href=""https://unpkg.com/swagger-ui-dist/swagger-ui.css"">
+</head>
+<body>
+<div id=""swagger-ui""></div>
+<script src=""https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js""></script>
+<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+</body>
+</html>";
+                var bytes = System.Text.Encoding.UTF8.GetBytes(html);
+                res.StatusCode = 200;
+                await res.OutputStream.WriteAsync(bytes);
+                res.OutputStream.Close();
+                return;
+            }
+
             // Route-based tool dispatch
             foreach (var (name, tool) in _tools)
             {
@@ -828,5 +871,107 @@ public class ZeroMcpServer
         }
 
         return result.Count > 0 ? result : null;
+    }
+
+    /// <summary>
+    /// Build an OpenAPI 3.0 spec from all tools that have a Route defined.
+    /// </summary>
+    private Dictionary<string, object> BuildOpenApiSpec()
+    {
+        var title = _config.Title ?? "ZeroMCP";
+        var paths = new Dictionary<string, object>();
+
+        foreach (var (name, tool) in _tools)
+        {
+            if (tool.Route == null) continue;
+
+            var routeMethod = tool.Route.Method.ToLowerInvariant();
+            var routePath = tool.Route.Path;
+
+            // Convert :param to {param} for OpenAPI path syntax
+            var openApiPath = System.Text.RegularExpressions.Regex.Replace(routePath, @":(\w+)", "{$1}");
+
+            // Extract path param names
+            var pathParamNames = System.Text.RegularExpressions.Regex.Matches(routePath, @":(\w+)")
+                .Select(m => m.Groups[1].Value)
+                .ToHashSet();
+
+            var operation = new Dictionary<string, object>
+            {
+                ["operationId"] = name,
+                ["description"] = tool.Description,
+                ["responses"] = new Dictionary<string, object>
+                {
+                    ["200"] = new Dictionary<string, object> { ["description"] = "Success" },
+                    ["500"] = new Dictionary<string, object> { ["description"] = "Error" }
+                }
+            };
+
+            if (routeMethod == "get")
+            {
+                var parameters = new List<object>();
+                foreach (var (fieldName, field) in tool.Input)
+                {
+                    var location = pathParamNames.Contains(fieldName) ? "path" : "query";
+                    var required = location == "path" || !field.Optional;
+                    var paramObj = new Dictionary<string, object>
+                    {
+                        ["name"] = fieldName,
+                        ["in"] = location,
+                        ["required"] = required,
+                        ["schema"] = BuildOpenApiPropertySchema(field)
+                    };
+                    parameters.Add(paramObj);
+                }
+                if (parameters.Count > 0)
+                    operation["parameters"] = parameters;
+            }
+            else
+            {
+                var properties = new Dictionary<string, object>();
+                var required = new List<string>();
+                foreach (var (fieldName, field) in tool.Input)
+                {
+                    properties[fieldName] = BuildOpenApiPropertySchema(field);
+                    if (!field.Optional) required.Add(fieldName);
+                }
+                var bodySchema = new Dictionary<string, object> { ["type"] = "object", ["properties"] = properties };
+                if (required.Count > 0) bodySchema["required"] = required;
+                operation["requestBody"] = new Dictionary<string, object>
+                {
+                    ["content"] = new Dictionary<string, object>
+                    {
+                        ["application/json"] = new Dictionary<string, object> { ["schema"] = bodySchema }
+                    }
+                };
+            }
+
+            if (!paths.ContainsKey(openApiPath))
+                paths[openApiPath] = new Dictionary<string, object>();
+
+            ((Dictionary<string, object>)paths[openApiPath])[routeMethod] = operation;
+        }
+
+        return new Dictionary<string, object>
+        {
+            ["openapi"] = "3.0.0",
+            ["info"] = new Dictionary<string, object> { ["title"] = title, ["version"] = "0.5.0" },
+            ["paths"] = paths
+        };
+    }
+
+    private static Dictionary<string, object> BuildOpenApiPropertySchema(InputField field)
+    {
+        var typeName = field.Type switch
+        {
+            SimpleType.Number => "number",
+            SimpleType.Boolean => "boolean",
+            SimpleType.Object => "object",
+            SimpleType.Array => "array",
+            _ => "string"
+        };
+        var schema = new Dictionary<string, object> { ["type"] = typeName };
+        if (field.Description != null) schema["description"] = field.Description;
+        return schema;
     }
 }

@@ -29,6 +29,7 @@ export interface ToolSource {
 }
 
 export interface Config {
+  title?: string;
   tools?: string | (string | ToolSource)[];
   transport?: TransportConfig | TransportConfig[];
   logging?: boolean;

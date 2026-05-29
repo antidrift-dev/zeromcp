@@ -18,6 +18,7 @@ type Config struct {
 	ExecuteTimeout    int                          `json:"execute_timeout,omitempty"` // ms, default 30000
 	PageSize          int                          `json:"page_size,omitempty"`       // 0 = no pagination
 	Icon              string                       `json:"icon,omitempty"`            // data URI, URL, or file path (resolved at startup)
+	Title             string                       `json:"title,omitempty"`           // OpenAPI spec title (default "ZeroMCP")
 }
 
 // TransportConfig defines a transport type and its settings.

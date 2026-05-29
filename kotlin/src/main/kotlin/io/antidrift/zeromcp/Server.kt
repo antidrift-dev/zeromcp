@@ -147,6 +147,39 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
             httpJson(exchange, responseStr, 200)
         }
 
+        server.createContext("/openapi.json") { exchange ->
+            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                writeCors(exchange); return@createContext
+            }
+            setCors(exchange)
+            httpJson(exchange, buildOpenApiSpec(tools, schemas, config.title), 200)
+        }
+
+        server.createContext("/docs") { exchange ->
+            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
+                writeCors(exchange); return@createContext
+            }
+            setCors(exchange)
+            val html = """<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroMCP API</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+</body>
+</html>"""
+            val bytes = html.toByteArray()
+            exchange.responseHeaders.set("Content-Type", "text/html")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+
         server.createContext("/") { exchange ->
             if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
                 writeCors(exchange); return@createContext
@@ -546,6 +579,83 @@ private fun httpJson(exchange: HttpExchange, body: String, status: Int) {
     exchange.responseHeaders.set("Content-Type", "application/json")
     exchange.sendResponseHeaders(status, bytes.size.toLong())
     exchange.responseBody.use { it.write(bytes) }
+}
+
+// --- OpenAPI spec builder ---
+
+private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): String {
+    val paths = mutableMapOf<String, Any>()
+
+    for ((_, tool) in tools) {
+        val route = tool.route ?: continue
+        val pathParams = Regex(":([a-zA-Z_][a-zA-Z0-9_]*)").findAll(route.path)
+            .map { it.groupValues[1] }.toSet()
+        val openApiPath = route.path.replace(Regex(":([a-zA-Z_][a-zA-Z0-9_]*)"), "{$1}")
+
+        val parameters = mutableListOf<Map<String, Any>>()
+        val isGet = route.method == "GET"
+
+        for ((fieldName, field) in tool.input) {
+            if (isGet) {
+                val location = if (fieldName in pathParams) "path" else "query"
+                val param = mutableMapOf<String, Any>(
+                    "name" to fieldName,
+                    "in" to location,
+                    "required" to (!field.optional || location == "path"),
+                    "schema" to mapOf("type" to field.type.jsonType)
+                )
+                field.description?.let { param["description"] = it }
+                parameters.add(param)
+            }
+        }
+
+        val operation = mutableMapOf<String, Any>(
+            "operationId" to tool.name,
+            "description" to tool.description,
+            "responses" to mapOf(
+                "200" to mapOf("description" to "Success"),
+                "500" to mapOf("description" to "Error")
+            )
+        )
+        if (parameters.isNotEmpty()) operation["parameters"] = parameters
+
+        if (!isGet && tool.input.isNotEmpty()) {
+            val schema = schemas[tool.name]
+            if (schema != null) {
+                operation["requestBody"] = mapOf(
+                    "required" to true,
+                    "content" to mapOf(
+                        "application/json" to mapOf("schema" to schema)
+                    )
+                )
+            }
+        }
+
+        val method = route.method.lowercase()
+        paths[openApiPath] = mapOf(method to operation)
+    }
+
+    val spec = buildJsonObject {
+        put("openapi", "3.0.0")
+        putJsonObject("info") {
+            put("title", title)
+            put("version", "0.5.0")
+        }
+        putJsonObject("paths") {
+            for ((path, pathItem) in paths) {
+                @Suppress("UNCHECKED_CAST")
+                val item = pathItem as Map<String, Any>
+                putJsonObject(path) {
+                    for ((method, op) in item) {
+                        @Suppress("UNCHECKED_CAST")
+                        put(method, toJsonElement(op) as JsonObject)
+                    }
+                }
+            }
+        }
+    }
+
+    return Json.encodeToString(JsonObject.serializer(), spec)
 }
 
 // --- Route matching ---

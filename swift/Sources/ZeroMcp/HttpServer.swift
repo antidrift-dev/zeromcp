@@ -144,7 +144,7 @@ extension ZeroMcp {
         requestLine: String,
         headers: [String: String],
         body: Data
-    ) async -> (status: Int, body: Data) {
+    ) async -> (status: Int, body: Data, contentType: String) {
         let req = parseRequestLine(requestLine)
 
         // /mcp — JSON-RPC over HTTP
@@ -154,9 +154,27 @@ extension ZeroMcp {
             }
             if let resp = await handleRequest(rpcObj),
                let data = try? JSONSerialization.data(withJSONObject: resp) {
-                return (200, data)
+                return (200, data, "application/json")
             }
             return jsonResponse(status: 204, object: [:] as [String: Any])
+        }
+
+        // /health
+        if req.path == "/health" && req.method == "GET" {
+            return jsonResponse(status: 200, object: ["ok": true])
+        }
+
+        // /openapi.json
+        if req.path == "/openapi.json" && req.method == "GET" {
+            let spec = buildOpenApiSpec()
+            return jsonResponse(status: 200, object: spec)
+        }
+
+        // /docs — Swagger UI
+        if req.path == "/docs" && req.method == "GET" {
+            let html = buildSwaggerHtml()
+            let data = html.data(using: .utf8) ?? Data()
+            return (200, data, "text/html; charset=utf-8")
         }
 
         // Tool routes
@@ -213,14 +231,117 @@ extension ZeroMcp {
         return params
     }
 
-    // MARK: - Response helpers
+    // MARK: - OpenAPI spec builder
 
-    private func jsonResponse(status: Int, object: Any) -> (status: Int, body: Data) {
-        let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
-        return (status, data)
+    private func buildOpenApiSpec() -> [String: Any] {
+        let title = config.title ?? "ZeroMCP"
+        var paths: [String: Any] = [:]
+
+        for (name, tool) in tools.sorted(by: { $0.key < $1.key }) {
+            guard let route = tool.route else { continue }
+
+            let pathParams = extractPathParams(from: route.path)
+            let isBodyMethod = route.method != "GET"
+            let schema = tool.cachedSchema
+
+            var operation: [String: Any] = [
+                "operationId": name,
+                "description": tool.description,
+                "responses": [
+                    "200": ["description": "Success"],
+                    "500": ["description": "Error"]
+                ] as [String: Any]
+            ]
+
+            if isBodyMethod {
+                var props: [String: Any] = [:]
+                for (key, prop) in schema.properties {
+                    var p: [String: Any] = ["type": prop.type]
+                    if let desc = prop.description { p["description"] = desc }
+                    props[key] = p
+                }
+                var bodySchema: [String: Any] = ["type": "object", "properties": props]
+                if !schema.required.isEmpty { bodySchema["required"] = schema.required }
+                operation["requestBody"] = [
+                    "required": true,
+                    "content": ["application/json": ["schema": bodySchema]] as [String: Any]
+                ] as [String: Any]
+            } else {
+                var parameters: [[String: Any]] = []
+                for (key, prop) in schema.properties {
+                    let location = pathParams.contains(key) ? "path" : "query"
+                    let isRequired = schema.required.contains(key) || location == "path"
+                    let paramSchema: [String: Any] = ["type": prop.type]
+                    var param: [String: Any] = [
+                        "name": key,
+                        "in": location,
+                        "required": isRequired,
+                        "schema": paramSchema
+                    ]
+                    if let desc = prop.description { param["description"] = desc }
+                    parameters.append(param)
+                }
+                operation["parameters"] = parameters
+            }
+
+            let openApiPath = route.path.replacingOccurrences(of: #":([\w]+)"#, with: "{$1}", options: .regularExpression)
+            let methodKey = route.method.lowercased()
+
+            if var existing = paths[openApiPath] as? [String: Any] {
+                existing[methodKey] = operation
+                paths[openApiPath] = existing
+            } else {
+                paths[openApiPath] = [methodKey: operation] as [String: Any]
+            }
+        }
+
+        return [
+            "openapi": "3.0.0",
+            "info": ["title": title, "version": "0.5.0"] as [String: Any],
+            "paths": paths
+        ]
     }
 
-    private func writeHttpResponse(_ connection: NWConnection, response: (status: Int, body: Data)) {
+    private func extractPathParams(from path: String) -> Set<String> {
+        var params: Set<String> = []
+        let pattern = try? NSRegularExpression(pattern: #":(\w+)"#)
+        let ns = path as NSString
+        pattern?.enumerateMatches(in: path, range: NSRange(location: 0, length: ns.length)) { match, _, _ in
+            if let match = match, match.numberOfRanges > 1,
+               let range = Range(match.range(at: 1), in: path) {
+                params.insert(String(path[range]))
+            }
+        }
+        return params
+    }
+
+    private func buildSwaggerHtml() -> String {
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>ZeroMCP API</title>
+          <meta charset="utf-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+        </head>
+        <body>
+        <div id="swagger-ui"></div>
+        <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+        <script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+        </body>
+        </html>
+        """
+    }
+
+    // MARK: - Response helpers
+
+    private func jsonResponse(status: Int, object: Any) -> (status: Int, body: Data, contentType: String) {
+        let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
+        return (status, data, "application/json")
+    }
+
+    private func writeHttpResponse(_ connection: NWConnection, response: (status: Int, body: Data, contentType: String)) {
         let statusText = response.status == 200 ? "OK"
             : response.status == 204 ? "No Content"
             : response.status == 400 ? "Bad Request"
@@ -228,7 +349,7 @@ extension ZeroMcp {
             : "Internal Server Error"
 
         let header = "HTTP/1.1 \(response.status) \(statusText)\r\n" +
-            "Content-Type: application/json\r\n" +
+            "Content-Type: \(response.contentType)\r\n" +
             "Content-Length: \(response.body.count)\r\n" +
             "Connection: close\r\n\r\n"
 

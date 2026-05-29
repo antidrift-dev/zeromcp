@@ -120,9 +120,110 @@ class Server
             return;
         }
 
+        // GET /openapi.json
+        if ($method === 'GET' && $path === '/openapi.json') {
+            header('Content-Type: application/json');
+            echo json_encode($this->buildOpenApiSpec(), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+            return;
+        }
+
+        // GET /docs — Swagger UI
+        if ($method === 'GET' && $path === '/docs') {
+            header('Content-Type: text/html; charset=utf-8');
+            echo $this->buildSwaggerHtml();
+            return;
+        }
+
         http_response_code(404);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Not found']);
+    }
+
+    private function buildOpenApiSpec(): array
+    {
+        $paths = [];
+
+        foreach ($this->tools as $name => $tool) {
+            if ($tool->route === null) continue;
+            $routeMethod = strtolower($tool->route['method'] ?? 'get');
+            $routePath   = $tool->route['path'] ?? '';
+
+            // Convert :param to {param} for OpenAPI
+            $openApiPath = preg_replace('/:([a-zA-Z_][a-zA-Z0-9_]*)/', '{$1}', $routePath);
+
+            // Extract path param names from original route
+            preg_match_all('/:([a-zA-Z_][a-zA-Z0-9_]*)/', $routePath, $pathParamMatches);
+            $pathParamNames = $pathParamMatches[1] ?? [];
+
+            $inputSchema = $tool->cachedSchema;
+            $properties  = (array)($inputSchema['properties'] ?? []);
+            $required    = $inputSchema['required'] ?? [];
+
+            $operation = [
+                'operationId' => $name,
+                'description' => $tool->description,
+                'responses'   => [
+                    '200' => ['description' => 'Success'],
+                    '500' => ['description' => 'Error'],
+                ],
+            ];
+
+            if ($routeMethod === 'get') {
+                $parameters = [];
+                foreach ($properties as $paramName => $propSchema) {
+                    $in = in_array($paramName, $pathParamNames, true) ? 'path' : 'query';
+                    $parameters[] = [
+                        'name'     => $paramName,
+                        'in'       => $in,
+                        'required' => $in === 'path' || in_array($paramName, $required, true),
+                        'schema'   => $propSchema,
+                    ];
+                }
+                if (!empty($parameters)) {
+                    $operation['parameters'] = $parameters;
+                }
+            } else {
+                $operation['requestBody'] = [
+                    'content' => [
+                        'application/json' => ['schema' => $inputSchema],
+                    ],
+                ];
+            }
+
+            if (!isset($paths[$openApiPath])) {
+                $paths[$openApiPath] = [];
+            }
+            $paths[$openApiPath][$routeMethod] = $operation;
+        }
+
+        return [
+            'openapi' => '3.0.0',
+            'info'    => [
+                'title'   => $this->config->title,
+                'version' => '0.5.0',
+            ],
+            'paths' => empty($paths) ? new \stdClass() : $paths,
+        ];
+    }
+
+    private function buildSwaggerHtml(): string
+    {
+        return <<<'HTML'
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroMCP API</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+</body>
+</html>
+HTML;
     }
 
     public function serve(): void

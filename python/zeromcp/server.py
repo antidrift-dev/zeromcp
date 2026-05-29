@@ -59,6 +59,7 @@ def _build_state(config: dict) -> dict:
         "page_size": config.get("page_size", 0),
         "log_level": "info",
         "icon": icon,
+        "title": config.get("title", "ZeroMCP"),
     }
 
 
@@ -524,6 +525,74 @@ async def _handle_http_route(tool: dict, path_params: dict, method: str, body: b
         return 500, {"ok": False, "error": str(exc)}
 
 
+def _build_openapi(state: dict) -> dict:
+    """Build an OpenAPI 3.0 spec from tools that have a route field."""
+    title = state.get("title", "ZeroMCP")
+    paths: dict = {}
+    for name, tool in state["tools"].items():
+        route = tool.get("route")
+        if not route:
+            continue
+        path = route["path"]
+        method = route["method"].lower()
+        # Extract :param names from path
+        path_param_names = set(re.findall(r":(\w+)", path))
+        # Convert :param → {param} for OpenAPI
+        openapi_path = re.sub(r":(\w+)", r"{\1}", path)
+        description = tool.get("description", "")
+        cached_schema = tool.get("_cached_schema", {})
+        properties = cached_schema.get("properties", {})
+        required_fields = set(cached_schema.get("required", []))
+        operation: dict = {
+            "operationId": name,
+            "description": description,
+            "responses": {"200": {"description": "Success"}, "500": {"description": "Error"}},
+        }
+        if method == "get":
+            parameters = []
+            for param, prop in properties.items():
+                location = "path" if param in path_param_names else "query"
+                param_schema = {"type": prop.get("type", "string")}
+                entry: dict = {
+                    "name": param,
+                    "in": location,
+                    "required": location == "path" or param in required_fields,
+                    "schema": param_schema,
+                }
+                if "description" in prop:
+                    entry["description"] = prop["description"]
+                parameters.append(entry)
+            operation["parameters"] = parameters
+        else:
+            operation["requestBody"] = {
+                "content": {"application/json": {"schema": cached_schema}},
+            }
+        if openapi_path not in paths:
+            paths[openapi_path] = {}
+        paths[openapi_path][method] = operation
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": title, "version": "0.5.0"},
+        "paths": paths,
+    }
+
+
+_DOCS_HTML = """<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroMCP API</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
+</body>
+</html>"""
+
+
 async def _start_http(state: dict, host: str, port: int) -> None:
     """Start a minimal HTTP server that handles /mcp (JSON-RPC) and tool routes."""
     import urllib.parse
@@ -563,6 +632,25 @@ async def _start_http(state: dict, host: str, port: int) -> None:
                         pass
 
             body = body[:content_length] if content_length else body
+
+            # /openapi.json — OpenAPI spec
+            if pathname == "/openapi.json" and req_method == "GET":
+                spec = _build_openapi(state)
+                _http_respond(writer, 200, spec)
+                return
+
+            # /docs — Swagger UI
+            if pathname == "/docs" and req_method == "GET":
+                html = _DOCS_HTML.encode("utf-8")
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/html; charset=utf-8\r\n"
+                    f"Content-Length: {len(html)}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                ).encode("utf-8") + html
+                writer.write(response)
+                return
 
             # /mcp — JSON-RPC handler
             if pathname == "/mcp" and req_method == "POST":

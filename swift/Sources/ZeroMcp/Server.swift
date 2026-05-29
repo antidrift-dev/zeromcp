@@ -14,7 +14,7 @@ public class ZeroMcp {
     private var logLevel: String = "info"
     private var roots: [[String: Any]] = []
     private var clientCapabilities: [String: Any] = [:]
-    private let config: ZeroMcpConfig
+    let config: ZeroMcpConfig
 
     /// Optional icon URI included in list responses.
     public var icon: String?

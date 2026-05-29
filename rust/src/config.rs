@@ -23,6 +23,10 @@ pub struct Config {
     /// Cache credentials after first read when true (default). Set false to re-read on every tool call.
     #[serde(default = "default_cache_credentials")]
     pub cache_credentials: bool,
+
+    /// Title used in the OpenAPI spec (default "ZeroMCP").
+    #[serde(default = "default_title")]
+    pub title: String,
 }
 
 fn default_separator() -> String {
@@ -37,6 +41,10 @@ fn default_cache_credentials() -> bool {
     true
 }
 
+fn default_title() -> String {
+    "ZeroMCP".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -45,6 +53,7 @@ impl Default for Config {
             separator: "_".to_string(),
             execute_timeout: 30000,
             cache_credentials: true,
+            title: "ZeroMCP".to_string(),
         }
     }
 }

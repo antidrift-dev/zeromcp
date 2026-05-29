@@ -24,6 +24,10 @@
     "./handler": {
       "types": "./dist/handler.d.ts",
       "import": "./dist/handler.js"
+    },
+    "./dispatch": {
+      "types": "./dist/dispatch.d.ts",
+      "import": "./dist/dispatch.js"
     }
   },
   "scripts": {

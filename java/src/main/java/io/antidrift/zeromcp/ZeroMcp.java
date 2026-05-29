@@ -130,6 +130,41 @@ public class ZeroMcp {
             }
         });
 
+        // /openapi.json — auto-generated OpenAPI 3.0 spec from route-annotated tools
+        server.createContext("/openapi.json", exchange -> {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            var spec = buildOpenApiSpec();
+            var bytes = gson.toJson(spec).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var os = exchange.getResponseBody()) { os.write(bytes); }
+        });
+
+        // /docs — Swagger UI HTML pointing at /openapi.json
+        server.createContext("/docs", exchange -> {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            var html = "<!DOCTYPE html>\n<html>\n<head>\n" +
+                "  <title>ZeroMCP API</title>\n" +
+                "  <meta charset=\"utf-8\"/>\n" +
+                "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
+                "  <link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist/swagger-ui.css\">\n" +
+                "</head>\n<body>\n" +
+                "<div id=\"swagger-ui\"></div>\n" +
+                "<script src=\"https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js\"></script>\n" +
+                "<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>\n" +
+                "</body>\n</html>";
+            var bytes = html.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var os = exchange.getResponseBody()) { os.write(bytes); }
+        });
+
         // Register a context for each route-annotated tool
         for (var entry : tools.entrySet()) {
             var toolName = entry.getKey();
@@ -244,6 +279,82 @@ public class ZeroMcp {
             }
         }
         return map;
+    }
+
+    /**
+     * Build an OpenAPI 3.0 spec from all tools that have a route field.
+     */
+    private JsonObject buildOpenApiSpec() {
+        var spec = new JsonObject();
+        spec.addProperty("openapi", "3.0.0");
+
+        var info = new JsonObject();
+        info.addProperty("title", config.title());
+        info.addProperty("version", "0.5.0");
+        spec.add("info", info);
+
+        var paths = new JsonObject();
+        for (var entry : tools.entrySet()) {
+            var toolName = entry.getKey();
+            var namedTool = entry.getValue();
+            var route = namedTool.tool().route();
+            if (route == null) continue;
+
+            // Extract :param names from the path pattern
+            var pathParamNames = new ArrayList<String>();
+            for (var segment : route.path().split("/", -1)) {
+                if (segment.startsWith(":")) pathParamNames.add(segment.substring(1));
+            }
+
+            // Convert :param to {param} for OpenAPI path format
+            var openApiPath = route.path().replaceAll(":([^/]+)", "{$1}");
+
+            var operation = new JsonObject();
+            operation.addProperty("operationId", toolName);
+            var desc = namedTool.tool().description();
+            if (desc != null && !desc.isEmpty()) operation.addProperty("description", desc);
+
+            var isGet = "GET".equals(route.method());
+            if (isGet) {
+                var parameters = new JsonArray();
+                for (var input : namedTool.tool().inputs()) {
+                    var param = new JsonObject();
+                    param.addProperty("name", input.name());
+                    param.addProperty("in", pathParamNames.contains(input.name()) ? "path" : "query");
+                    param.addProperty("required", !input.optional());
+                    var paramSchema = new JsonObject();
+                    paramSchema.addProperty("type", input.type().jsonType());
+                    if (input.description() != null) paramSchema.addProperty("description", input.description());
+                    param.add("schema", paramSchema);
+                    parameters.add(param);
+                }
+                operation.add("parameters", parameters);
+            } else {
+                var requestBody = new JsonObject();
+                var content = new JsonObject();
+                var mediaType = new JsonObject();
+                mediaType.add("schema", namedTool.inputSchema());
+                content.add("application/json", mediaType);
+                requestBody.add("content", content);
+                operation.add("requestBody", requestBody);
+            }
+
+            var responses = new JsonObject();
+            var r200 = new JsonObject();
+            r200.addProperty("description", "Success");
+            responses.add("200", r200);
+            var r500 = new JsonObject();
+            r500.addProperty("description", "Error");
+            responses.add("500", r500);
+            operation.add("responses", responses);
+
+            var pathItem = new JsonObject();
+            pathItem.add(route.method().toLowerCase(), operation);
+            paths.add(openApiPath, pathItem);
+        }
+
+        spec.add("paths", paths);
+        return spec;
     }
 
     /**
