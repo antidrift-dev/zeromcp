@@ -1,111 +1,99 @@
 import Foundation
-import Network
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
-// MARK: - HTTP route dispatch for ZeroMcp
+// MARK: - HTTP route dispatch for ZeroMcp (POSIX sockets — works on Linux + macOS)
 
 extension ZeroMcp {
-    /// Start a minimal HTTP server that dispatches registered tool routes.
-    /// Tools with a `route` field are reachable at their defined method+path.
-    /// The /mcp endpoint accepts POST for JSON-RPC (same as stdio but over HTTP).
-    ///
-    /// - Parameter port: TCP port to listen on (default 3000).
-    public func serveHttp(port: UInt16 = 3000) async {
+    /// Start an HTTP server using POSIX sockets (cross-platform: Linux + macOS).
+    /// Blocks until the socket fails. Run in a Task or background thread.
+    public func serveHttp(port: UInt16 = 3000) {
+        let sockfd = socket(AF_INET, SOCK_STREAM, 0)
+        guard sockfd >= 0 else {
+            fputs(stderr, "[zeromcp] socket() failed\n")
+            return
+        }
+        var yes: Int32 = 1
+        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr.s_addr = INADDR_ANY
+
+        let bound = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(sockfd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bound == 0 else {
+            fputs(stderr, "[zeromcp] bind() failed on port \(port)\n")
+            close(sockfd)
+            return
+        }
+        listen(sockfd, 64)
         fputs(stderr, "[zeromcp] HTTP server listening on port \(port)\n")
         fputs(stderr, "[zeromcp] \(tools.filter { $0.value.route != nil }.count) route(s) registered\n")
 
-        let listener: NWListener
-        do {
-            listener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: port)!)
-        } catch {
-            fputs(stderr, "[zeromcp] Failed to create listener: \(error)\n")
-            return
-        }
-
-        let queue = DispatchQueue(label: "zeromcp.http")
-        listener.newConnectionHandler = { [weak self] connection in
-            guard let self = self else { return }
-            connection.start(queue: queue)
-            self.handleHttpConnection(connection)
-        }
-        listener.start(queue: queue)
-
-        // Park the current async task indefinitely while the listener runs.
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            listener.stateUpdateHandler = { state in
-                if case .failed(let err) = state {
-                    fputs(stderr, "[zeromcp] Listener failed: \(err)\n")
-                    cont.resume()
+        while true {
+            var clientAddr = sockaddr_in()
+            var clientLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+            let clientfd = withUnsafeMutablePointer(to: &clientAddr) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    accept(sockfd, $0, &clientLen)
                 }
             }
+            guard clientfd >= 0 else { continue }
+            Task { await self.handlePosixConnection(fd: clientfd) }
         }
     }
 
     // MARK: - Connection handling
 
-    private func handleHttpConnection(_ connection: NWConnection) {
-        readHttpRequest(connection) { [weak self] requestLine, headers, body in
-            guard let self = self else { return }
-            Task {
-                let response = await self.dispatchHttpRequest(
-                    requestLine: requestLine,
-                    headers: headers,
-                    body: body
-                )
-                self.writeHttpResponse(connection, response: response)
-            }
-        }
+    private func handlePosixConnection(fd: Int32) async {
+        defer { close(fd) }
+        guard let (requestLine, headers, body) = readPosixRequest(fd: fd) else { return }
+        let response = await dispatchHttpRequest(requestLine: requestLine, headers: headers, body: body)
+        writePosixResponse(fd: fd, response: response)
     }
 
-    private func readHttpRequest(
-        _ connection: NWConnection,
-        completion: @escaping (String, [String: String], Data) -> Void
-    ) {
+    private func readPosixRequest(fd: Int32) -> (String, [String: String], Data)? {
         var buffer = Data()
+        let chunk = 4096
+        while true {
+            var tmp = [UInt8](repeating: 0, count: chunk)
+            let n = recv(fd, &tmp, chunk, 0)
+            if n <= 0 { break }
+            buffer.append(contentsOf: tmp[0..<n])
+            if buffer.range(of: Data("\r\n\r\n".utf8)) != nil { break }
+        }
+        guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
 
-        func receive() {
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
-                if let data = data { buffer.append(data) }
+        let headerString = String(data: buffer[buffer.startIndex..<headerEnd.lowerBound], encoding: .utf8) ?? ""
+        let lines = headerString.components(separatedBy: "\r\n")
+        let requestLine = lines.first ?? ""
 
-                // Wait until we have the full headers (double CRLF)
-                guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else {
-                    if !isComplete && error == nil { receive() }
-                    return
-                }
-
-                let headerData = buffer[buffer.startIndex..<headerEnd.lowerBound]
-                let headerString = String(data: headerData, encoding: .utf8) ?? ""
-                let lines = headerString.components(separatedBy: "\r\n")
-                let requestLine = lines.first ?? ""
-
-                var headers: [String: String] = [:]
-                for line in lines.dropFirst() {
-                    let parts = line.split(separator: ":", maxSplits: 1)
-                    if parts.count == 2 {
-                        headers[parts[0].trimmingCharacters(in: .whitespaces).lowercased()] =
-                            parts[1].trimmingCharacters(in: .whitespaces)
-                    }
-                }
-
-                let bodyStart = headerEnd.upperBound
-                var body = Data(buffer[bodyStart...])
-                let contentLength = headers["content-length"].flatMap { Int($0) } ?? 0
-
-                if body.count >= contentLength {
-                    completion(requestLine, headers, Data(body.prefix(contentLength)))
-                } else {
-                    // Read remaining body bytes
-                    let remaining = contentLength - body.count
-                    connection.receive(
-                        minimumIncompleteLength: remaining,
-                        maximumLength: remaining
-                    ) { extra, _, _, _ in
-                        if let extra = extra { body.append(extra) }
-                        completion(requestLine, headers, Data(body.prefix(contentLength)))
-                    }
-                }
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            if parts.count == 2 {
+                headers[parts[0].trimmingCharacters(in: .whitespaces).lowercased()] =
+                    parts[1].trimmingCharacters(in: .whitespaces)
             }
         }
-        receive()
+
+        var body = Data(buffer[headerEnd.upperBound...])
+        let contentLength = headers["content-length"].flatMap { Int($0) } ?? 0
+        while body.count < contentLength {
+            var tmp = [UInt8](repeating: 0, count: min(chunk, contentLength - body.count))
+            let n = recv(fd, &tmp, tmp.count, 0)
+            if n <= 0 { break }
+            body.append(contentsOf: tmp[0..<n])
+        }
+        return (requestLine, headers, Data(body.prefix(contentLength)))
     }
 
     // MARK: - Dispatch
@@ -341,7 +329,7 @@ extension ZeroMcp {
         return (status, data, "application/json")
     }
 
-    private func writeHttpResponse(_ connection: NWConnection, response: (status: Int, body: Data, contentType: String)) {
+    private func writePosixResponse(fd: Int32, response: (status: Int, body: Data, contentType: String)) {
         let statusText = response.status == 200 ? "OK"
             : response.status == 204 ? "No Content"
             : response.status == 400 ? "Bad Request"
@@ -351,14 +339,14 @@ extension ZeroMcp {
         let header = "HTTP/1.1 \(response.status) \(statusText)\r\n" +
             "Content-Type: \(response.contentType)\r\n" +
             "Content-Length: \(response.body.count)\r\n" +
+            "Access-Control-Allow-Origin: *\r\n" +
             "Connection: close\r\n\r\n"
 
-        var responseData = header.data(using: .utf8)!
-        responseData.append(response.body)
-
-        connection.send(content: responseData, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        var data = header.data(using: .utf8)!
+        data.append(response.body)
+        data.withUnsafeBytes { ptr in
+            _ = send(fd, ptr.baseAddress!, data.count, 0)
+        }
     }
 }
 
