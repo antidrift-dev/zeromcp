@@ -28,7 +28,17 @@
     "./dispatch": {
       "types": "./dist/dispatch.d.ts",
       "import": "./dist/dispatch.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js"
     }
+  },
+  "peerDependencies": {
+    "hono": "^4"
+  },
+  "peerDependenciesMeta": {
+    "hono": { "optional": true }
   },
   "scripts": {
     "build": "tsc",
@@ -36,6 +46,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "hono": "^4.12.23",
     "typescript": "^5.4.0"
   },
   "keywords": [
