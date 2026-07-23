@@ -34,19 +34,12 @@
       "import": "./dist/registry.js"
     }
   },
-  "peerDependencies": {
-    "hono": "^4"
-  },
-  "peerDependenciesMeta": {
-    "hono": { "optional": true }
-  },
   "scripts": {
     "build": "tsc",
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "hono": "^4.12.23",
     "typescript": "^5.4.0"
   },
   "keywords": [
