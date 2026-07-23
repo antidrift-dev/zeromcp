@@ -1,40 +1,32 @@
-/**
- * ZeroMCP Hono registry — mounts tools as HTTP routes and an MCP endpoint.
- *
- * Usage:
- *   import { registerTools } from '@antidrift/zeromcp/registry'
- *
- *   const mcp = registerTools(tools, app, { getEnv: () => env })
- *   app.post('/mcp', async (c) => c.json(await mcp(await c.req.json())))
- */
-
-import type { Hono, Context } from 'hono'
+/** Framework-neutral tool registry for MCP, REST adapters, and OpenAPI adapters. */
 import { createState, handleRequest, type JsonRpcRequest, type JsonRpcResponse } from './dispatch.js'
 import { toJsonSchema, type InputSchema } from './schema.js'
 
+export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 export type McpHandler = (request: JsonRpcRequest) => Promise<JsonRpcResponse | null>
 
 export interface Tool<TEnv = Record<string, unknown>> {
   description: string
   input: InputSchema
-  route?: {
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-    path: string
-  }
+  route?: { method: RouteMethod; path: string }
   execute: (args: Record<string, unknown>, env: TEnv) => Promise<unknown>
 }
 
-export interface RegisterOptions<TEnv> {
-  /** Provide env for MCP-path tool calls (no Hono context available there). */
-  getEnv?: () => TEnv
-  /** Return a Response to reject the request, or null to allow. Called before any protected route. */
-  auth?: (c: Context, toolName: string) => Promise<Response | null>
+export interface RouteDefinition<TEnv = Record<string, unknown>> {
+  name: string
+  method: RouteMethod
+  path: string
+  tool: Tool<TEnv>
 }
 
-function queryParams(url: string): Record<string, string> {
-  const out: Record<string, string> = {}
-  new URL(url).searchParams.forEach((v, k) => { out[k] = v })
-  return out
+export interface RegistryOptions<TEnv> {
+  getEnv?: () => TEnv
+}
+
+export interface ToolRegistry<TEnv = Record<string, unknown>> {
+  routes: RouteDefinition<TEnv>[]
+  openapi: Record<string, unknown>
+  mcp: McpHandler
 }
 
 function buildOpenApiSpec(tools: Record<string, Tool>): Record<string, unknown> {
@@ -66,14 +58,12 @@ function buildOpenApiSpec(tools: Record<string, Tool>): Record<string, unknown> 
   return { openapi: '3.0.0', info: { title: 'API', version: '1.0.0' }, paths }
 }
 
-export function registerTools<TEnv = Record<string, unknown>>(
+export function createRegistry<TEnv = Record<string, unknown>>(
   tools: Record<string, Tool<TEnv>>,
-  app: Hono,
-  options: RegisterOptions<TEnv> = {},
-): McpHandler {
-  const { getEnv = () => ({} as TEnv), auth } = options
+  options: RegistryOptions<TEnv> = {},
+): ToolRegistry<TEnv> {
+  const getEnv = options.getEnv ?? (() => ({} as TEnv))
   const toolMap = new Map()
-
   for (const [name, tool] of Object.entries(tools)) {
     toolMap.set(name, {
       description: tool.description,
@@ -81,36 +71,11 @@ export function registerTools<TEnv = Record<string, unknown>>(
       cachedSchema: toJsonSchema(tool.input),
       execute: (args: Record<string, unknown>) => tool.execute(args, getEnv()),
     })
-
-    if (tool.route) {
-      const { method, path } = tool.route
-      const m = method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'
-      console.log(`[zeromcp] registering ${method} ${path}`)
-
-      app[m](path, async (c) => {
-        if (auth) {
-          const rejection = await auth(c, name)
-          if (rejection) return rejection
-        }
-
-        const args = m === 'get'
-          ? { ...c.req.param(), ...queryParams(c.req.url) }
-          : { ...c.req.param(), ...await c.req.json().catch(() => ({})) }
-
-        try {
-          const result = await tool.execute(args, c.env as TEnv ?? getEnv())
-          return c.json({ ok: true, result })
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          console.error(`[zeromcp:${name}] ${message}`)
-          return c.json({ ok: false, error: message }, 500)
-        }
-      })
-    }
   }
-
-  app.get('/openapi.json', (c) => c.json(buildOpenApiSpec(tools as Record<string, Tool>)))
-
   const state = createState({ tools: toolMap, executeTimeout: 30_000, version: '1.0.0' })
-  return (request: JsonRpcRequest) => handleRequest(request, state)
+  return {
+    routes: Object.entries(tools).flatMap(([name, tool]) => tool.route ? [{ name, ...tool.route, tool }] : []),
+    openapi: buildOpenApiSpec(tools as Record<string, Tool>),
+    mcp: (request: JsonRpcRequest) => handleRequest(request, state),
+  }
 }
