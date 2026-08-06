@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Swift port design for the framework-neutral registry shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md`). Nothing in this file exists in `swift/` yet; it is written to be implementable directly.
+**Shipped**, on branch `registry/swift`. Implemented exactly as designed below: `Registry.swift` (new `RegistryRoute`/`McpHandler`/`RegistryOptions`/`Registry` types and the free function `createRegistry`), plus the one visibility change to `HttpServer.swift`'s `buildOpenApiSpec()` (`private` → `internal`). Covered by 8 new tests in `RegistryTests.swift` (route filtering, sorted order, OpenAPI parity, direct tool invocation, `mcp` dispatch for `tools/list` and `tools/call`, empty-routes case, and that the default `RegistryOptions()` doesn't touch disk). `swift build` (all targets, including `RouteTest`/`example`) and `swift test` (71 tests, 0 failures, 0 regressions) both pass.
 
 ## Motivation
 

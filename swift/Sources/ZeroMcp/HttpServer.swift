@@ -221,7 +221,7 @@ extension ZeroMcp {
 
     // MARK: - OpenAPI spec builder
 
-    private func buildOpenApiSpec() -> [String: Any] {
+    func buildOpenApiSpec() -> [String: Any] {
         let title = config.title ?? "ZeroMCP"
         var paths: [String: Any] = [:]
 
