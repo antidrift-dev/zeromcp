@@ -2,6 +2,10 @@ name: Publish PHP (Packagist webhook)
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.3.0). Required when running manually — github.ref_name is "main" on manual dispatch, not the release tag.'
+        required: true
   push:
     tags:
       - 'v*'
@@ -16,9 +20,11 @@ jobs:
           token: ${{ secrets.PAT_SUBTREE }}
 
       - name: Push subtree to zeromcp-php
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           git config --global credential.helper store
           echo "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com" > ~/.git-credentials
           SHA=$(git subtree split --prefix=php HEAD)
           git push "https://github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/heads/main" --force
-          git push "https://github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/tags/${{ github.ref_name }}" --force
+          git push "https://github.com/antidrift-dev/zeromcp-php.git" "$SHA:refs/tags/$TAG" --force
