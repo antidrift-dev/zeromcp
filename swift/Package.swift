@@ -14,6 +14,7 @@ let package = Package(
         .executable(name: "zeromcp-credential-test", targets: ["CredentialTest"]),
         .executable(name: "zeromcp-resource-test", targets: ["ZeroMcpResourceTest"]),
         .executable(name: "zeromcp-cache-cred-test", targets: ["CacheCredTest"]),
+        .executable(name: "zeromcp-route-test", targets: ["RouteTest"]),
     ],
     targets: [
         .target(
@@ -59,6 +60,11 @@ let package = Package(
             name: "CacheCredTest",
             dependencies: ["ZeroMcp"],
             path: "Sources/CacheCredTest"
+        ),
+        .executableTarget(
+            name: "RouteTest",
+            dependencies: ["ZeroMcp"],
+            path: "Sources/RouteTest"
         ),
         .testTarget(
             name: "ZeroMcpTests",

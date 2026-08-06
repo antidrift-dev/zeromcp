@@ -1,0 +1,4 @@
+{
+  "tools": ["./tests/conformance/route-tools"],
+  "transport": [{ "type": "http", "port": 14251 }]
+}

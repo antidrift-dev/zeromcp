@@ -991,6 +991,30 @@ async function main() {
     }
   }
 
+  // Route + OpenAPI suite (separate runner)
+  if (!suiteFilter || suiteFilter.toLowerCase() === 'route') {
+    try {
+      const { runRouteSuite } = await import('./run-route.js');
+      console.log('  Route + OpenAPI');
+      const results = await runRouteSuite();
+      for (const r of results) {
+        const total = r.passed + r.failed;
+        const status = r.failed === 0 ? '✓' : '✗';
+        console.log(`    ${status} ${r.name} — ${r.passed}/${total} passed`);
+        if (r.failures?.length) {
+          for (const f of r.failures) {
+            console.log(`      ✗ ${f.test}: ${f.errors[0]}`);
+          }
+        }
+        totalPassed += r.failed === 0 ? 1 : 0;
+        totalFailed += r.failed > 0 ? 1 : 0;
+      }
+      console.log();
+    } catch (err) {
+      console.log(`  ⊘ Route + OpenAPI — skipped (${err.message})`);
+    }
+  }
+
   console.log(`  ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped\n`);
   process.exit(totalFailed > 0 ? 1 : 0);
 }
