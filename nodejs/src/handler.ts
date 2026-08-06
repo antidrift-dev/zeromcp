@@ -8,6 +8,7 @@
  */
 
 import { ToolScanner } from './scanner.js';
+import { RemoteManager } from './remote.js';
 import { ResourceScanner } from './resource-scanner.js';
 import { PromptScanner } from './prompt-scanner.js';
 import { loadConfig, resolveIcon, type Config } from './config.js';
@@ -32,8 +33,20 @@ export async function createHandler<TRuntime = unknown>(toolsOrConfig?: string |
     config = toolsOrConfig || {};
   }
 
+  const allTools = new Map<string, import('./scanner.js').ToolDefinition>();
+  const remoteManager = new RemoteManager();
+
+  if (config.remote?.length) {
+    const remoteTools = await remoteManager.connect(config.remote);
+    for (const [name, tool] of remoteTools) allTools.set(name, tool);
+  }
+
   const toolScanner = new ToolScanner<TRuntime>(config, { getRuntime: options.getRuntime });
   await toolScanner.scan();
+  for (const [name, tool] of toolScanner.tools) {
+    if (allTools.has(name)) console.error(`[zeromcp] Local tool "${name}" overrides remote`);
+    allTools.set(name, tool);
+  }
 
   const resourceScanner = new ResourceScanner(config);
   await resourceScanner.scan();
@@ -44,7 +57,7 @@ export async function createHandler<TRuntime = unknown>(toolsOrConfig?: string |
   const icon = await resolveIcon(config.icon);
 
   const state = createState({
-    tools: toolScanner.tools,
+    tools: allTools,
     resources: resourceScanner.resources,
     templates: resourceScanner.templates,
     prompts: promptScanner.prompts,
