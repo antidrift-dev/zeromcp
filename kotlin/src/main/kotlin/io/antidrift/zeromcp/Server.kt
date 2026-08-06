@@ -63,6 +63,24 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
     }
 
     /**
+     * Build a framework-neutral [Registry] view over the tools registered so
+     * far. Call after all `tool { ... }` / `register(...)` calls.
+     */
+    fun registry(): Registry {
+        val routeDefs = tools.values
+            .filter { it.route != null }
+            .map { tool ->
+                val r = tool.route!!
+                RouteDefinition(name = tool.name, method = r.method, path = r.path, tool = tool)
+            }
+        return Registry(
+            routes = routeDefs,
+            openapi = buildOpenApiSpecJson(tools, schemas, config.title),
+            mcp = { request -> handleRequest(request) }
+        )
+    }
+
+    /**
      * Register a resource using the DSL builder.
      */
     fun resource(name: String, block: ResourceBuilder.() -> Unit) {
@@ -583,7 +601,11 @@ private fun httpJson(exchange: HttpExchange, body: String, status: Int) {
 
 // --- OpenAPI spec builder ---
 
-private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): String {
+internal fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): String {
+    return Json.encodeToString(JsonObject.serializer(), buildOpenApiSpecJson(tools, schemas, title))
+}
+
+internal fun buildOpenApiSpecJson(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): JsonObject {
     val paths = mutableMapOf<String, Any>()
 
     for ((_, tool) in tools) {
@@ -655,7 +677,7 @@ private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<St
         paths[openApiPath] = mapOf(method to operation)
     }
 
-    val spec = buildJsonObject {
+    return buildJsonObject {
         put("openapi", "3.0.0")
         putJsonObject("info") {
             put("title", title)
@@ -674,8 +696,6 @@ private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<St
             }
         }
     }
-
-    return Json.encodeToString(JsonObject.serializer(), spec)
 }
 
 // --- Route matching ---
