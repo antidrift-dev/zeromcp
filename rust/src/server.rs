@@ -12,13 +12,13 @@ use tokio::net::TcpListener;
 
 /// The MCP server. Register tools, resources, prompts, then call `serve()`.
 pub struct Server {
-    tools: BTreeMap<String, Tool>,
+    pub(crate) tools: BTreeMap<String, Arc<Tool>>,
     resources: BTreeMap<String, Resource>,
     templates: BTreeMap<String, ResourceTemplate>,
     prompts: BTreeMap<String, Prompt>,
     #[allow(dead_code)]
     subscriptions: BTreeSet<String>,
-    config: Config,
+    pub(crate) config: Config,
     #[allow(dead_code)]
     log_level: String,
     page_size: usize,
@@ -69,7 +69,7 @@ impl Server {
         validate_permissions(name, &tool.permissions);
         // Cache the JSON schema at registration time so it isn't rebuilt per request.
         tool.cached_schema = tool.input.to_json_schema();
-        self.tools.insert(name.to_string(), tool);
+        self.tools.insert(name.to_string(), Arc::new(tool));
     }
 
     /// Convenience: register a tool with just a description, input, and handler.

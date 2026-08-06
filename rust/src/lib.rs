@@ -27,6 +27,7 @@
 //! ```
 
 pub mod config;
+pub mod registry;
 pub mod sandbox;
 pub mod schema;
 pub mod server;

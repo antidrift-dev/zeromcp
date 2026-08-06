@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Rust port plan for the framework-neutral tool registry that shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md`). Nothing described here exists in `rust/src/` yet.
+**Shipped**, on branch `registry/rust`. Implemented exactly as designed below: `rust/src/registry.rs` adds `create_registry`, `Registry`, `RouteDefinition`, `McpHandler`/`McpFuture`, and `Registry::ctx_for`. `Server::tools` was changed from `BTreeMap<String, Tool>` to `BTreeMap<String, Arc<Tool>>` (and both `tools`/`config` widened to `pub(crate)`) exactly per "Porting notes" point 1 — a pure storage-representation change; every existing call site kept compiling unchanged. Covered by 8 new unit tests in `registry.rs`'s `#[cfg(test)] mod tests` (route filtering, sort order, OpenAPI parity with `Server::build_openapi`, `ctx_for` correctness, direct tool invocation, `mcp` dispatch for both `tools/list` and `tools/call`, empty-routes case). `cargo build`, `cargo test` (75 + 8 + 7 = 90 tests, all passing, zero regressions), and `cargo clippy --all-targets` (zero new warnings — the 5 shown are pre-existing, unrelated to `registry.rs`) all pass.
 
 ## Motivation
 
