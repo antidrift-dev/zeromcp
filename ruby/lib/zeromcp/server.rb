@@ -9,21 +9,23 @@ require_relative 'config'
 require_relative 'tool'
 require_relative 'scanner'
 require_relative 'sandbox'
+require_relative 'openapi'
+require_relative 'credentials'
 
 module ZeroMcp
   class Server
-    def initialize(config = nil)
+    def initialize(config = nil, tools: nil)
       @config = config || Config.load
       @scanner = Scanner.new(@config)
       @resource_scanner = ResourceScanner.new(@config)
       @prompt_scanner = PromptScanner.new(@config)
-      @tools = {}
+      @tools = tools || {}
       @resources = {}
       @templates = {}
       @prompts = {}
       @subscriptions = {}
       @log_level = 'info'
-      @icon = nil
+      @icon = tools ? Config.resolve_icon(@config.icon) : nil
       @credential_cache = {}
     end
 
@@ -74,9 +76,7 @@ module ZeroMcp
       # Register per-tool HTTP routes
       @tools.each do |_name, tool|
         next unless tool.route.is_a?(Hash)
-        route_method = (tool.route[:method] || tool.route['method'] || 'POST').upcase
-        route_path   = tool.route[:path]   || tool.route['path']   || '/'
-        register_tool_route(http, tool, route_method, route_path)
+        register_tool_route(http, tool, tool.route_method, tool.route_path)
       end
 
       trap('INT')  { http.shutdown }
@@ -499,37 +499,7 @@ module ZeroMcp
     end
 
     def _resolve_credentials(tool_name)
-      return nil if @config.credentials.empty?
-      @config.credentials.each do |ns, source|
-        if tool_name.start_with?("#{ns}_") || tool_name.start_with?("#{ns}#{@config.separator}")
-          return _resolve_credentials_for_ns(ns.to_s, source)
-        end
-      end
-      nil
-    end
-
-    def _resolve_credentials_for_ns(ns, source)
-      return _resolve_credential_source(source) unless @config.cache_credentials
-      return @credential_cache[ns] if @credential_cache.key?(ns)
-      creds = _resolve_credential_source(source)
-      @credential_cache[ns] = creds
-      creds
-    end
-
-    def _resolve_credential_source(source)
-      source = source.transform_keys(&:to_s) if source.is_a?(Hash)
-      if source['env']
-        val = ENV[source['env']]
-        return nil if val.nil? || val.empty?
-        begin; return JSON.parse(val); rescue; return val; end
-      end
-      if source['file']
-        path = File.expand_path(source['file'])
-        return nil unless File.exist?(path)
-        val = File.read(path).strip
-        begin; return JSON.parse(val); rescue; return val; end
-      end
-      nil
+      Credentials.resolve(tool_name, @config, cache: @credential_cache)
     end
 
     # --- HTTP route helpers ---
@@ -600,113 +570,7 @@ module ZeroMcp
     # --- OpenAPI spec builder ---
 
     def build_openapi_spec
-      paths = {}
-
-      @tools.each do |_name, tool|
-        next unless tool.route.is_a?(Hash)
-
-        route_method = (tool.route[:method] || tool.route['method'] || 'POST').upcase
-        route_path   = tool.route[:path]   || tool.route['path']   || '/'
-
-        # Extract :param names from path, convert to {param} for OpenAPI
-        path_param_names = route_path.scan(/:([A-Za-z_][A-Za-z0-9_]*)/).flatten
-        openapi_path = route_path.gsub(/:([A-Za-z_][A-Za-z0-9_]*)/, '{\1}')
-
-        input = tool.input || {}
-        operation = {
-          'operationId' => tool.name,
-          'description' => tool.description || '',
-          'responses'   => {
-            '200' => { 'description' => 'Success' },
-            '500' => { 'description' => 'Error' }
-          }
-        }
-
-        if route_method == 'GET'
-          operation['parameters'] = build_openapi_parameters(input, path_param_names)
-        else
-          operation['requestBody'] = build_openapi_request_body(input, path_param_names)
-          unless path_param_names.empty?
-            operation['parameters'] = path_param_names.map do |name|
-              {
-                'name'     => name,
-                'in'       => 'path',
-                'required' => true,
-                'schema'   => { 'type' => 'string' }
-              }
-            end
-          end
-        end
-
-        paths[openapi_path] ||= {}
-        paths[openapi_path][route_method.downcase] = operation
-      end
-
-      {
-        'openapi' => '3.0.0',
-        'info'    => { 'title' => @config.title, 'version' => '0.5.0' },
-        'paths'   => paths
-      }
-    end
-
-    def build_openapi_parameters(input, path_param_names)
-      params = []
-
-      # Path params first (preserve order from path)
-      path_param_names.each do |name|
-        spec = input_field_to_openapi_schema(input[name] || input[name.to_sym])
-        params << {
-          'name'     => name,
-          'in'       => 'path',
-          'required' => true,
-          'schema'   => spec
-        }
-      end
-
-      # Remaining fields as query params
-      input.each do |key, value|
-        key_s = key.to_s
-        next if path_param_names.include?(key_s)
-
-        spec     = input_field_to_openapi_schema(value)
-        optional = value.is_a?(Hash) && (value[:optional] || value['optional'])
-        params << {
-          'name'     => key_s,
-          'in'       => 'query',
-          'required' => !optional,
-          'schema'   => spec
-        }
-      end
-
-      params
-    end
-
-    def build_openapi_request_body(input, path_param_names)
-      body_input = input.reject { |key, _| path_param_names.include?(key.to_s) }
-      schema = Schema.to_json_schema(body_input)
-      {
-        'required' => true,
-        'content'  => {
-          'application/json' => { 'schema' => schema }
-        }
-      }
-    end
-
-    def input_field_to_openapi_schema(value)
-      return { 'type' => 'string' } if value.nil?
-
-      if value.is_a?(String)
-        Schema::TYPE_MAP[value] || { 'type' => 'string' }
-      elsif value.is_a?(Hash)
-        type = value[:type] || value['type']
-        mapped = Schema::TYPE_MAP[type.to_s] || { 'type' => 'string' }
-        spec = mapped.dup
-        desc = value[:description] || value['description']
-        spec['description'] = desc if desc
-        spec
-      else
-        { 'type' => 'string' }
-      end
+      OpenApi.build(@tools, @config)
     end
 
     SWAGGER_UI_HTML = <<~HTML.freeze

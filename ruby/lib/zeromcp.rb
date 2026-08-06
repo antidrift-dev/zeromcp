@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'zeromcp/server'
+require_relative 'zeromcp/registry'
 
 module ZeroMcp
   def self.serve(config_path = nil)
