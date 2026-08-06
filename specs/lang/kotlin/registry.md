@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Kotlin port plan for the framework-neutral registry shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md` for the as-built reference). Nothing in this file exists in `kotlin/` yet.
+**Shipped**, on branch `registry/kotlin`. Implemented exactly as designed below: `Registry.kt` (new `McpHandler`/`RouteDefinition`/`Registry` types) and `ZeroMcp.registry()` on the existing `Server.kt`. `buildOpenApiSpec` was split into a `String`-returning wrapper plus a new `buildOpenApiSpecJson` core, both widened from `private` to `internal`, exactly per "Behavior"/"Porting notes" above. Covered by 7 new tests in `RegistryTest.kt` (route filtering, insertion-order preservation, OpenAPI parity, direct tool invocation, `mcp` dispatch for `tools/list` and `tools/call`, empty-routes case). `gradle build` (whole module including `example`) and `gradle test` both pass clean: 66 tests, 0 failures.
 
 ## Motivation
 
