@@ -17,6 +17,14 @@ public class ZeroMcpServer
     /// <summary>Optional icon URI applied to all list entries.</summary>
     public string? Icon { get; set; }
 
+    /// <summary>
+    /// Optional override for building the ToolContext passed to a tool's Execute
+    /// during tools/call dispatch. Null (the default) preserves existing behavior
+    /// for Serve()/ServeHttp(); set by Registry.Create when RegistryOptions.GetContext
+    /// is supplied.
+    /// </summary>
+    internal Func<string, Permissions?, ToolContext>? ContextFactory { get; set; }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -539,7 +547,8 @@ public class ZeroMcpServer
 
         try
         {
-            var ctx = new ToolContext { ToolName = name, Permissions = tool.Permissions };
+            var ctx = ContextFactory?.Invoke(name, tool.Permissions)
+                ?? new ToolContext { ToolName = name, Permissions = tool.Permissions };
             var timeoutMs = tool.Permissions?.ExecuteTimeout ?? _config.ExecuteTimeout ?? 30000;
 
             var executeTask = tool.Execute!(args, ctx);
@@ -876,7 +885,7 @@ public class ZeroMcpServer
     /// <summary>
     /// Build an OpenAPI 3.0 spec from all tools that have a Route defined.
     /// </summary>
-    private Dictionary<string, object> BuildOpenApiSpec()
+    internal Dictionary<string, object> BuildOpenApiSpec()
     {
         var title = _config.Title ?? "ZeroMCP";
         var paths = new Dictionary<string, object>();
