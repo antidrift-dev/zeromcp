@@ -34,7 +34,31 @@ The official SDK has **no sandbox**. ZeroMCP lets tools declare network, filesys
 
 ## HTTP / Streamable HTTP
 
-ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you an async `handleRequest` method that takes a `[String: Any]` dict and returns `[String: Any]?`.
+ZeroMCP ships a built-in HTTP server (POSIX sockets — Linux + macOS, no framework required). Register a tool with a `route:` to expose it as a REST endpoint too:
+
+```swift
+server.tool(
+    "greet",
+    description: "Greet a person by name",
+    input: ["name": .simple(.string)],
+    route: RouteDefinition(method: "GET", path: "/greet/:name")
+) { args, ctx in
+    "Hello, \(args["name"] as? String ?? "world")!"
+}
+
+await server.serveHttp(port: 3000)
+```
+
+`serveHttp` also exposes:
+
+- `POST /mcp` — JSON-RPC over HTTP
+- `GET /health` — health check
+- `GET /openapi.json` — OpenAPI 3.0 spec generated from registered routes
+- `GET /docs` — Swagger UI
+
+### Bring your own framework
+
+You don't have to use `serveHttp`. ZeroMCP also gives you an async `handleRequest` method that takes a `[String: Any]` dict and returns `[String: Any]?`, so you can wire it into any HTTP framework yourself.
 
 ```swift
 // let response = await server.handleRequest(request)
@@ -81,7 +105,7 @@ server.tool(
     description: "Fetch from our API",
     input: ["url": .simple(.string)],
     permissions: Permissions(
-        network: .allowList(["api.example.com"]),
+        network: .allowlist(["api.example.com"]),
         fs: .none,
         exec: false
     )

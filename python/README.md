@@ -29,7 +29,7 @@ In benchmarks, ZeroMCP Python handles 12,936 requests/second over stdio versus t
 
 Python passes all 10 conformance suites and survives 21/22 chaos monkey attacks.
 
-The official SDK has **no sandbox**. ZeroMCP enforces per-tool network allowlists, credential isolation, and filesystem controls at runtime.
+The official SDK has **no sandbox**. ZeroMCP enforces per-tool network allowlists and credential isolation at runtime, plus static auditing for filesystem and exec access.
 
 ## HTTP / Streamable HTTP
 
@@ -107,7 +107,7 @@ Return a string or a dict. ZeroMCP wraps it in the MCP content envelope for you.
 
 ## Sandbox
 
-The Python implementation has full runtime sandboxing.
+The Python implementation sandboxes network access at runtime and audits filesystem/exec access statically.
 
 ### Network allowlists
 
@@ -133,7 +133,7 @@ Tools receive secrets via `ctx.credentials`, configured per namespace. Tools nev
 
 ### Filesystem and exec control
 
-Tools must declare `fs: 'read'` or `fs: 'write'` for filesystem access. Static auditing and proxy objects enforce the restrictions.
+Declaring `fs` or `exec` in a tool's `permissions` gets logged as an elevated-permission request when the tool loads. Enforcement is static, not runtime: `python3 -m zeromcp audit ./tools` scans tool files for raw `open()`, `subprocess`, `os.system`, `os.popen`, and `os.environ` calls and reports them as violations. Unlike `ctx.fetch`, there's no sandboxed proxy for filesystem or exec access — route network calls through `ctx.fetch` and keep filesystem/exec code auditable.
 
 ## Directory structure
 

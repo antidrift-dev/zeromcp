@@ -95,10 +95,10 @@ server.Tool("fetch_data", new ToolDefinition
     {
         ["url"] = new InputField(SimpleType.String)
     },
-    Permissions = new ToolPermissions
+    Permissions = new Permissions
     {
         Network = new[] { "api.example.com", "*.internal.dev" },
-        Fs = FsPermission.None,
+        Fs = false,
         Exec = false
     },
     Execute = async (args, ctx) => { /* ... */ }

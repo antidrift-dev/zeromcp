@@ -111,8 +111,8 @@ server.tool("fetch_url") {
 ```kotlin
 permissions {
     network("api.example.com", "*.internal.dev")
-    fs(FsPermission.READ)
-    exec(false)
+    fs("read")
+    exec()
 }
 ```
 

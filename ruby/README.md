@@ -43,6 +43,11 @@ ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives 
 ```ruby
 require 'sinatra'
 require 'json'
+require_relative 'lib/zeromcp'
+
+config = ZeroMcp::Config.load
+server = ZeroMcp::Server.new(config)
+server.load_tools
 
 post '/mcp' do
   request_body = JSON.parse(request.body.read)
@@ -66,7 +71,7 @@ end
 
 ```sh
 gem build zeromcp.gemspec
-gem install zeromcp-0.1.0.gem
+gem install zeromcp-0.2.2.gem
 ```
 
 ## Sandbox
@@ -99,5 +104,5 @@ tools/
 ## Testing
 
 ```sh
-ruby -I lib -I test -e 'Dir["test/**/*_test.rb"].each { |f| require_relative f }'
+ruby -I lib -I test -e 'Dir["test/**/test_*.rb"].each { |f| require_relative f }'
 ```

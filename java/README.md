@@ -36,7 +36,20 @@ The official SDK has **no sandbox**. ZeroMCP adds per-tool network allowlists, f
 
 ## HTTP / Streamable HTTP
 
-ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handleRequest` method that takes a `JsonObject` and returns a `JsonObject` (or `null` for notifications).
+ZeroMCP ships a zero-dependency built-in HTTP server: `server.serveHttp(port)` starts a JDK `HttpServer` that serves `/mcp` for JSON-RPC over POST, mounts any tool with a `.route(method, path)` at its configured path, and auto-generates `/openapi.json` plus a Swagger UI at `/docs` from route-annotated tools.
+
+```java
+server.tool("greet", Tool.builder()
+    .description("Greet a person by name")
+    .input(Input.required("name", "string"))
+    .route("GET", "/greet/:name")
+    .execute((a, ctx) -> "Hello, " + a.get("name") + "!")
+    .build());
+
+server.serveHttp(4242);
+```
+
+If you'd rather bring your own framework, ZeroMCP also gives you a `handleRequest` method that takes a `JsonObject` and returns a `JsonObject` (or `null` for notifications).
 
 ```java
 // JsonObject response = server.handleRequest(request);
@@ -71,8 +84,8 @@ app.post("/mcp", ctx -> {
 ```sh
 mvn package -q -DskipTests
 mvn dependency:copy-dependencies -DoutputDirectory=target/deps -q
-javac -cp "target/zeromcp-0.1.0.jar:target/deps/*" -d /tmp/java-out example/src/main/java/Main.java
-java -cp "target/zeromcp-0.1.0.jar:target/deps/*:/tmp/java-out" Main
+javac -cp "target/zeromcp-0.2.2.jar:target/deps/*" -d /tmp/java-out example/src/main/java/Main.java
+java -cp "target/zeromcp-0.2.2.jar:target/deps/*:/tmp/java-out" Main
 ```
 
 ## Sandbox
@@ -103,8 +116,8 @@ server.tool("fetch_url", Tool.builder()
 
 Sealed interface pattern for type-safe permissions:
 
-- `NetworkPermission.allowList(...)` / `.ALL` / `.DENIED`
-- `FsPermission.READ` / `.WRITE` / `.NONE`
+- `NetworkPermission.allowList(...)` / `.all()` / `.denied()`
+- `FsPermission.READ` / `.WRITE` / `.NONE` / `.FULL`
 - `exec: true/false`
 
 ## Testing

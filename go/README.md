@@ -76,6 +76,25 @@ http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 http.ListenAndServe(":4242", nil)
 ```
 
+## HTTP routes & OpenAPI docs
+
+Give a tool a `Route`, and it becomes a plain REST endpoint on the `http` transport &mdash; in addition to being callable over MCP:
+
+```go
+s.Tool("greet", zeromcp.Tool{
+    Description: "Greet a person by name",
+    Input:       zeromcp.Input{"name": "string"},
+    Route:       &zeromcp.RouteConfig{Method: "GET", Path: "/greet/:name"},
+    Execute: func(args map[string]any, ctx *zeromcp.Ctx) (any, error) {
+        return fmt.Sprintf("Hello, %s!", args["name"]), nil
+    },
+})
+```
+
+`:name`-style path segments become args. For `GET` routes, query parameters are also merged into args; for other methods, the JSON request body is merged in. A route response is `{"ok": true, "result": ...}` (200) or `{"ok": false, "error": ...}` (500).
+
+The server also serves `/openapi.json` (an OpenAPI 3.0 spec generated from every routed tool's `Input` schema) and `/docs` (a Swagger UI backed by that spec). Set `"title"` in `zeromcp.config.json` to name the spec (defaults to `"ZeroMCP"`).
+
 ## Requirements
 
 - Go 1.22+
@@ -107,7 +126,19 @@ s.Tool("fetch_data", zeromcp.Tool{
 
 ### Credential injection
 
-Credentials configured in `zeromcp.config.json` are available via `ctx.Credentials`. Tools never read `os.Getenv()` directly.
+Credentials configured in `zeromcp.config.json` are resolved by namespace via `server.ResolveToolCredentials(ns)`, where `ns` matches a key in the `credentials` map. Results are cached after the first read by default (set `"cache_credentials": false` to re-read on every call). Tools never read `os.Getenv()` directly.
+
+```go
+s.Tool("search_contacts", zeromcp.Tool{
+    Description: "Search contacts in a CRM",
+    Input:       zeromcp.Input{"query": "string"},
+    Execute: func(args map[string]any, ctx *zeromcp.Ctx) (any, error) {
+        creds := s.ResolveToolCredentials("api") // matches "api" in credentials config
+        // use creds...
+        return nil, nil
+    },
+})
+```
 
 ## Input types
 

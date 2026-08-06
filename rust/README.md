@@ -25,6 +25,7 @@ async fn main() {
                 })
             }),
             cached_schema: Default::default(),
+            route: None,
         },
     );
 
@@ -95,12 +96,13 @@ tokio = { version = "1", features = ["full"] }
 
 ```rust
 Permissions {
-    network: NetworkPermission::AllowList(vec![
+    network: Some(vec![
         "api.example.com".into(),
         "*.internal.dev".into(),
     ]),
-    fs: FsPermission::None,
+    fs: None,
     exec: false,
+    execute_timeout: None,
 }
 ```
 
@@ -108,7 +110,7 @@ Use `check_network()` to validate hostnames before making requests. Returns a de
 
 ### Filesystem and exec control
 
-- `FsPermission::Read` / `FsPermission::Write` / `FsPermission::None`
+- `fs: Some("read".into())` / `fs: Some("write".into())` / `fs: None`
 - `exec: true` / `exec: false`
 
 ## Input types

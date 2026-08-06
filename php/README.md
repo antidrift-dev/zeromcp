@@ -99,5 +99,5 @@ tools/
 ## Testing
 
 ```sh
-php tests/run.php
+for f in tests/*Test.php; do php "$f"; done
 ```
