@@ -87,7 +87,7 @@ The handler takes a JSON-RPC object and returns a JSON-RPC response. No opinions
 
 ## Requirements
 
-- Node.js 14+
+- Node.js 18+
 
 ## Defining tools
 
@@ -163,10 +163,13 @@ tools/
 ## Programmatic API
 
 ```js
-import { createHandler } from 'zeromcp/handler';  // HTTP handler
-import { ToolScanner } from 'zeromcp/scanner';     // Tool discovery
+import { createHandler } from 'zeromcp/handler';   // HTTP handler
+import { ToolScanner } from 'zeromcp/scanner';      // Tool discovery
 import { toJsonSchema, validate } from 'zeromcp/schema'; // Schema utils
+import { createRegistry } from 'zeromcp/registry';  // Framework-neutral tool registry (MCP + REST + OpenAPI)
 ```
+
+`createRegistry` is async and takes a plain object of tools you provide (rather than scanning a directory) — `const registry = await createRegistry(tools, options)` — returning `{ routes, openapi, mcp }`: a route table for wiring into any router, a ready-to-serve OpenAPI document, and an `mcp` handler with the same signature as `createHandler`. Like `createHandler`, it accepts an `options.remote` list of remote MCP servers to federate; their tools are merged in namespaced as `servername.toolname`, with any local tool of the same name overriding the remote one.
 
 ## Configuration
 

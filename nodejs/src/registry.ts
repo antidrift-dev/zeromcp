@@ -2,6 +2,8 @@
 import { createState, handleRequest, type JsonRpcRequest, type JsonRpcResponse } from './dispatch.js'
 import { toJsonSchema, type InputSchema } from './schema.js'
 import { buildOpenApiSpec, type OpenApiToolSource } from './openapi.js'
+import { RemoteManager } from './remote.js'
+import type { RemoteServer } from './config.js'
 
 export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 export type McpHandler = (request: JsonRpcRequest) => Promise<JsonRpcResponse | null>
@@ -27,6 +29,8 @@ export interface RegistryOptions<TEnv> {
   version?: string
   /** Default per-tool execute timeout in ms, unless a tool overrides it. Defaults to 30_000. */
   executeTimeout?: number
+  /** Remote MCP servers to federate. Their tools are merged in as `servername.toolname`; a local tool with the same name overrides the remote one. */
+  remote?: RemoteServer[]
 }
 
 export interface ToolRegistry<TEnv = Record<string, unknown>> {
@@ -35,14 +39,22 @@ export interface ToolRegistry<TEnv = Record<string, unknown>> {
   mcp: McpHandler
 }
 
-export function createRegistry<TEnv = Record<string, unknown>>(
+export async function createRegistry<TEnv = Record<string, unknown>>(
   tools: Record<string, Tool<TEnv>>,
   options: RegistryOptions<TEnv> = {},
-): ToolRegistry<TEnv> {
+): Promise<ToolRegistry<TEnv>> {
   const getEnv = options.getEnv ?? (() => ({} as TEnv))
   const toolMap = new Map<string, OpenApiToolSource & { input: InputSchema; execute: (args: Record<string, unknown>) => Promise<unknown> }>()
 
+  if (options.remote?.length) {
+    const remoteTools = await new RemoteManager().connect(options.remote)
+    for (const [name, tool] of remoteTools) {
+      toolMap.set(name, { description: tool.description, input: tool.input, cachedSchema: tool.cachedSchema, execute: tool.execute })
+    }
+  }
+
   for (const [name, tool] of Object.entries(tools)) {
+    if (toolMap.has(name)) console.error(`[zeromcp] Local tool "${name}" overrides remote`)
     toolMap.set(name, {
       description: tool.description,
       input: tool.input,
