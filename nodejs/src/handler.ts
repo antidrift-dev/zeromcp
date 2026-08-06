@@ -15,7 +15,11 @@ import { handleRequest, createState, type JsonRpcRequest, type JsonRpcResponse }
 
 export type McpHandler = (request: JsonRpcRequest) => Promise<JsonRpcResponse | null>;
 
-export async function createHandler(toolsOrConfig?: string | Config): Promise<McpHandler> {
+export interface HandlerOptions<TRuntime = unknown> {
+  getRuntime?: () => TRuntime;
+}
+
+export async function createHandler<TRuntime = unknown>(toolsOrConfig?: string | Config, options: HandlerOptions<TRuntime> = {}): Promise<McpHandler> {
   let config: Config;
 
   if (typeof toolsOrConfig === 'string') {
@@ -28,7 +32,7 @@ export async function createHandler(toolsOrConfig?: string | Config): Promise<Mc
     config = toolsOrConfig || {};
   }
 
-  const toolScanner = new ToolScanner(config);
+  const toolScanner = new ToolScanner<TRuntime>(config, { getRuntime: options.getRuntime });
   await toolScanner.scan();
 
   const resourceScanner = new ResourceScanner(config);

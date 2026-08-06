@@ -6,9 +6,10 @@ import type { Config, NamespaceOverride, CredentialSource, ToolSource } from './
 import { resolveCredentials, resolveToolSources } from './config.js';
 import { validatePermissions, createSandbox, type ToolPermissions, type SandboxContext, type SandboxOptions } from './sandbox.js';
 
-export interface ToolContext {
+export interface ToolContext<TRuntime = unknown> {
   credentials?: unknown;
   fetch: SandboxContext['fetch'];
+  runtime?: TRuntime;
 }
 
 export interface ToolDefinition {
@@ -20,7 +21,11 @@ export interface ToolDefinition {
   route?: { method: string; path: string };
 }
 
-export class ToolScanner {
+export interface ToolScannerOptions<TRuntime = unknown> {
+  getRuntime?: () => TRuntime;
+}
+
+export class ToolScanner<TRuntime = unknown> {
   tools: Map<string, ToolDefinition>;
   private sources: ToolSource[];
   private watchers: AbortController[];
@@ -31,8 +36,9 @@ export class ToolScanner {
   private cacheCredentials: boolean;
   private logging: boolean;
   private bypass: boolean;
+  private getRuntime?: () => TRuntime;
 
-  constructor(config?: Config) {
+  constructor(config?: Config, options: ToolScannerOptions<TRuntime> = {}) {
     this.tools = new Map();
     this.sources = resolveToolSources(config?.tools);
     this.watchers = [];
@@ -43,6 +49,7 @@ export class ToolScanner {
     this.cacheCredentials = config?.cache_credentials ?? true;
     this.logging = config?.logging ?? false;
     this.bypass = config?.bypass_permissions ?? false;
+    this.getRuntime = options.getRuntime;
   }
 
   async scan(): Promise<Map<string, ToolDefinition>> {
@@ -159,7 +166,8 @@ export class ToolScanner {
         cachedSchema: toJsonSchema(input),
         execute: (args: Record<string, unknown>) => {
           const credentials = this._resolveCredentials(filePath, rootDir);
-          const ctx: ToolContext = { credentials, fetch: sandbox.fetch };
+          const runtime = this.getRuntime?.();
+          const ctx: ToolContext<TRuntime> = { credentials, fetch: sandbox.fetch, ...(runtime === undefined ? {} : { runtime }) };
           return rawExecute(args, ctx);
         },
         execute_timeout: tool.permissions?.execute_timeout,
