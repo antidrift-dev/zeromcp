@@ -6,6 +6,7 @@ import { PromptScanner } from './prompt-scanner.js';
 import { RemoteManager } from './remote.js';
 import { loadConfig, resolveTransports, resolveAuth, resolveIcon, type Config } from './config.js';
 import { handleRequest, createState, type JsonRpcRequest, type ServerState } from './dispatch.js';
+import { buildOpenApiSpec } from './openapi.js';
 
 export async function serve(configOrPath?: Config | string): Promise<void> {
   let config: Config;
@@ -129,84 +130,6 @@ function startStdio(state: ServerState, httpAlso: boolean): void {
   });
 }
 
-function buildOpenApiSpec(state: ServerState, title: string): unknown {
-  const paths: Record<string, unknown> = {};
-
-  for (const [toolName, tool] of state.tools) {
-    if (!tool.route) continue;
-    const method = tool.route.method.toLowerCase();
-    const path = tool.route.path.replace(/:([^/]+)/g, '{$1}');
-    const pathParamNames = (tool.route.path.match(/:([^/]+)/g) || []).map((s: string) => s.slice(1));
-    const inputSchema = tool.input || {};
-
-    let operation: Record<string, unknown>;
-
-    if (method === 'get') {
-      const parameters: unknown[] = pathParamNames.map((pname: string) => ({
-        name: pname,
-        in: 'path',
-        required: true,
-        schema: { type: 'string' },
-      }));
-      for (const [key, field] of Object.entries(inputSchema)) {
-        if (pathParamNames.includes(key)) continue;
-        const isOptional = typeof field === 'object' && field !== null && (field as unknown as Record<string, unknown>).optional === true;
-        const fieldType = typeof field === 'string' ? field : ((field as unknown as Record<string, unknown>).type as string) ?? 'string';
-        const fieldDesc = typeof field === 'object' && field !== null ? (field as unknown as Record<string, unknown>).description as string | undefined : undefined;
-        const schema: Record<string, unknown> = { type: fieldType };
-        if (fieldDesc) schema.description = fieldDesc;
-        parameters.push({ name: key, in: 'query', required: !isOptional, schema });
-      }
-      operation = {
-        operationId: toolName,
-        description: tool.description || '',
-        parameters,
-        responses: { '200': { description: 'Success' }, '500': { description: 'Error' } },
-      };
-    } else {
-      const properties: Record<string, unknown> = {};
-      const required: string[] = [];
-      for (const [key, field] of Object.entries(inputSchema)) {
-        const isOptional = typeof field === 'object' && field !== null && (field as unknown as Record<string, unknown>).optional === true;
-        const fieldType = typeof field === 'string' ? field : ((field as unknown as Record<string, unknown>).type as string) ?? 'string';
-        const fieldDesc = typeof field === 'object' && field !== null ? (field as unknown as Record<string, unknown>).description as string | undefined : undefined;
-        const prop: Record<string, unknown> = { type: fieldType };
-        if (fieldDesc) prop.description = fieldDesc;
-        properties[key] = prop;
-        if (!isOptional) required.push(key);
-      }
-      const pathParameters = pathParamNames.map((pname: string) => ({
-        name: pname,
-        in: 'path',
-        required: true,
-        schema: { type: 'string' },
-      }));
-      operation = {
-        operationId: toolName,
-        description: tool.description || '',
-        ...(pathParameters.length ? { parameters: pathParameters } : {}),
-        requestBody: {
-          content: {
-            'application/json': {
-              schema: { type: 'object', properties, ...(required.length ? { required } : {}) },
-            },
-          },
-        },
-        responses: { '200': { description: 'Success' }, '500': { description: 'Error' } },
-      };
-    }
-
-    if (!paths[path]) paths[path] = {};
-    (paths[path] as Record<string, unknown>)[method] = operation;
-  }
-
-  return {
-    openapi: '3.0.0',
-    info: { title, version: '0.5.0' },
-    paths,
-  };
-}
-
 const SWAGGER_HTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -256,7 +179,7 @@ function startHttp(state: ServerState, port: number, authConfig?: string, config
 
     if (url.pathname === '/openapi.json' && req.method === 'GET') {
       const title = config.title || 'ZeroMCP';
-      json(res, buildOpenApiSpec(state, title));
+      json(res, buildOpenApiSpec(state.tools, { title, version: state.version }));
       return;
     }
 
