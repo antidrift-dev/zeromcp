@@ -19,6 +19,16 @@ module ZeroMcp
     def call(args, ctx = {})
       @execute_block.call(args, ctx)
     end
+
+    def route_method
+      return nil unless @route.is_a?(Hash)
+      (@route[:method] || @route['method'] || 'POST').upcase
+    end
+
+    def route_path
+      return nil unless @route.is_a?(Hash)
+      @route[:path] || @route['path'] || '/'
+    end
   end
 
   class Context
