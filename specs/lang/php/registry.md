@@ -2,7 +2,9 @@
 
 ## Status
 
-**Spec — not yet implemented.** This is the PHP port of the Node.js `registry.ts` feature (shipped; see `specs/lang/nodejs/registry.md` for the as-built reference). Written against PHP as it exists today: `php/src/Server.php`, `php/src/Tool.php`, `php/src/Scanner.php`, `php/src/Config.php`, `php/src/Schema.php` (composer.json version `0.2.2`).
+**Shipped**, on branch `registry/php`. Implemented exactly as designed below: `Registry.php` (`Registry`/`RouteDefinition` classes), `Server::fromTools()`, the `buildOpenApiSpec()` visibility change (`private` → `public`), the `$envOverride` seam in `resolveCredentials()`, and `Tool::fromDefinition()` (extracted from `Scanner::loadTool()`, which now calls it too — one mapping, two callers). Covered by 15 new tests in `tests/RegistryTest.php` (route filtering, insertion-order preservation, OpenAPI parity, direct tool invocation, `mcp` dispatch for `tools/list` and `tools/call`, `get_env` actually overriding `$ctx->credentials`, accepting raw definition arrays alongside `Tool` objects, empty-routes case, default-config-doesn't-read-disk). All 202 assertions across the full suite pass (21+27+32+30+77+15), zero regressions — confirmed `Scanner::loadTool()`'s refactor and `buildOpenApiSpec()`'s visibility change didn't change any existing behavior.
+
+One pre-existing, unrelated issue surfaced while verifying: invoking `php zeromcp.php http` outside a real SAPI context (plain CLI, no `php -S`/Apache/php-fpm) throws "headers already sent" warnings — confirmed via `git stash` that this happens identically on unmodified `main`, so it predates and is unrelated to this work. Not fixed here; flagging for whoever next touches `serveHttp()`.
 
 ## Motivation
 

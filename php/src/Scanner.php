@@ -139,19 +139,9 @@ class Scanner
                 return;
             }
 
-            $permissions = $toolDef['permissions'] ?? [];
-            $this->logPermissions($name, $permissions);
+            $this->logPermissions($name, $toolDef['permissions'] ?? []);
 
-            $route = isset($toolDef['route']) && is_array($toolDef['route']) ? $toolDef['route'] : null;
-
-            $this->tools[$name] = new Tool(
-                name: $name,
-                description: $toolDef['description'] ?? '',
-                input: $toolDef['input'] ?? [],
-                permissions: $permissions,
-                execute: $toolDef['execute'],
-                route: $route
-            );
+            $this->tools[$name] = Tool::fromDefinition($name, $toolDef);
 
             fwrite(STDERR, "[zeromcp] Loaded: $name\n");
         } catch (\Throwable $e) {
