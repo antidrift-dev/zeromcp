@@ -36,6 +36,21 @@ class Tool
     {
         return ($this->execute)($args, $ctx);
     }
+
+    /** Build a Tool from the array shape a tool file returns (description/input/permissions/execute/route). */
+    public static function fromDefinition(string $name, array $def): self
+    {
+        $route = isset($def['route']) && is_array($def['route']) ? $def['route'] : null;
+
+        return new self(
+            name: $name,
+            description: $def['description'] ?? '',
+            input: $def['input'] ?? [],
+            permissions: $def['permissions'] ?? [],
+            execute: $def['execute'],
+            route: $route
+        );
+    }
 }
 
 class Context

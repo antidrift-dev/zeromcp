@@ -20,6 +20,8 @@ class Server
     private ?string $icon = null;
     /** @var array<string, mixed> credential cache keyed by namespace */
     private array $credentialCache = [];
+    /** Overrides resolveCredentials() when set — used by Registry::create()'s get_env option. */
+    private ?\Closure $envOverride = null;
 
     private const ICON_MIME = [
         'png'  => 'image/png',
@@ -35,6 +37,23 @@ class Server
     {
         $this->config = $config ?? Config::load();
         $this->scanner = new Scanner($this->config);
+    }
+
+    /**
+     * Build a Server directly from already-constructed tools, bypassing Scanner::scan()
+     * and any directory/config-file reads. Used by Registry::create(); resources/templates/
+     * prompts stay empty since a registry only wires tools.
+     *
+     * @param array<string, Tool> $tools
+     */
+    public static function fromTools(array $tools, ?Config $config = null, ?callable $getEnv = null): self
+    {
+        $server = new self($config ?? new Config([]));
+        $server->tools = $tools;
+        if ($getEnv !== null) {
+            $server->envOverride = \Closure::fromCallable($getEnv);
+        }
+        return $server;
     }
 
     /**
@@ -139,7 +158,7 @@ class Server
         echo json_encode(['error' => 'Not found']);
     }
 
-    private function buildOpenApiSpec(): array
+    public function buildOpenApiSpec(): array
     {
         $paths = [];
 
@@ -622,6 +641,9 @@ HTML;
 
     private function resolveCredentials(string $toolName): mixed
     {
+        if ($this->envOverride !== null) {
+            return ($this->envOverride)();
+        }
         if (empty($this->config->credentials)) return null;
         foreach ($this->config->credentials as $ns => $source) {
             $sep = $this->config->separator;
