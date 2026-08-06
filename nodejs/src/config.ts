@@ -6,6 +6,8 @@ export interface RemoteServer {
   name: string;
   url: string;
   auth?: string;
+  /** Upstream tool names this role may use. Omit to expose the entire remote surface. */
+  tools?: string[];
 }
 
 export interface NamespaceOverride {
