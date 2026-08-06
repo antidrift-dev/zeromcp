@@ -564,9 +564,20 @@ def _build_openapi(state: dict) -> dict:
                 parameters.append(entry)
             operation["parameters"] = parameters
         else:
+            body_properties = {k: v for k, v in properties.items() if k not in path_param_names}
+            body_required = [k for k in cached_schema.get("required", []) if k not in path_param_names]
+            body_schema: dict = {"type": "object", "properties": body_properties}
+            if body_required:
+                body_schema["required"] = body_required
             operation["requestBody"] = {
-                "content": {"application/json": {"schema": cached_schema}},
+                "required": True,
+                "content": {"application/json": {"schema": body_schema}},
             }
+            if path_param_names:
+                operation["parameters"] = [
+                    {"name": param, "in": "path", "required": True, "schema": {"type": "string"}}
+                    for param in path_param_names
+                ]
         if openapi_path not in paths:
             paths[openapi_path] = {}
         paths[openapi_path][method] = operation

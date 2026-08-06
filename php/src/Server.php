@@ -183,11 +183,36 @@ class Server
                     $operation['parameters'] = $parameters;
                 }
             } else {
+                $bodyProperties = array_diff_key($properties, array_flip($pathParamNames));
+                $bodyRequired   = array_values(array_diff($required, $pathParamNames));
+
+                $bodySchema = [
+                    'type'       => 'object',
+                    'properties' => $bodyProperties,
+                ];
+                if (!empty($bodyRequired)) {
+                    $bodySchema['required'] = $bodyRequired;
+                }
+
                 $operation['requestBody'] = [
-                    'content' => [
-                        'application/json' => ['schema' => $inputSchema],
+                    'required' => true,
+                    'content'  => [
+                        'application/json' => ['schema' => $bodySchema],
                     ],
                 ];
+
+                if (!empty($pathParamNames)) {
+                    $parameters = [];
+                    foreach ($pathParamNames as $paramName) {
+                        $parameters[] = [
+                            'name'     => $paramName,
+                            'in'       => 'path',
+                            'required' => true,
+                            'schema'   => ['type' => 'string'],
+                        ];
+                    }
+                    $operation['parameters'] = $parameters;
+                }
             }
 
             if (!isset($paths[$openApiPath])) {

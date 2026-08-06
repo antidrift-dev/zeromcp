@@ -671,19 +671,27 @@ impl Server {
             } else {
                 let mut properties = json!({});
                 for (pname, prop) in &schema.properties {
+                    if path_params.contains(pname) {
+                        continue;
+                    }
                     let mut prop_schema = json!({ "type": prop.prop_type });
                     if let Some(ref desc) = prop.description {
                         prop_schema["description"] = json!(desc);
                     }
                     properties[pname] = prop_schema;
                 }
+                let required: Vec<&String> = schema
+                    .required
+                    .iter()
+                    .filter(|r| !path_params.contains(r))
+                    .collect();
                 let body_schema = json!({
                     "type": "object",
                     "properties": properties,
-                    "required": schema.required
+                    "required": required
                 });
 
-                json!({
+                let mut op = json!({
                     "operationId": name,
                     "description": tool.description,
                     "requestBody": {
@@ -696,7 +704,21 @@ impl Server {
                         "200": { "description": "Success" },
                         "500": { "description": "Error" }
                     }
-                })
+                });
+
+                if !path_params.is_empty() {
+                    let parameters: Vec<Value> = path_params.iter().map(|pname| {
+                        json!({
+                            "name": pname,
+                            "in": "path",
+                            "required": true,
+                            "schema": { "type": "string" }
+                        })
+                    }).collect();
+                    op["parameters"] = json!(parameters);
+                }
+
+                op
             };
 
             let method_key = method.to_lowercase();
@@ -1653,5 +1675,52 @@ mod tests {
         })).await.unwrap();
         let values = resp["result"]["completion"]["values"].as_array().unwrap();
         assert!(values.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // build_openapi: non-GET routes with path params
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn build_openapi_put_route_documents_path_param_separately() {
+        use crate::types::RouteConfig;
+
+        let mut server = Server::new();
+        server.tool(
+            "update_item",
+            Tool {
+                description: "Update an item".to_string(),
+                input: Input::new()
+                    .required("id", "string")
+                    .required_desc("name", "string", "New name for the item"),
+                permissions: Permissions::default(),
+                execute: Box::new(|_args: Value, _ctx: Ctx| {
+                    Box::pin(async { Ok(json!({})) })
+                }),
+                cached_schema: Default::default(),
+                route: Some(RouteConfig {
+                    method: "PUT".to_string(),
+                    path: "/items/:id".to_string(),
+                }),
+            },
+        );
+
+        let spec = server.build_openapi();
+        let op = &spec["paths"]["/items/{id}"]["put"];
+
+        // The path param must be documented as a "parameters" entry, not a body field.
+        let parameters = op["parameters"].as_array().expect("parameters array present");
+        assert_eq!(parameters.len(), 1);
+        assert_eq!(parameters[0]["name"], "id");
+        assert_eq!(parameters[0]["in"], "path");
+        assert_eq!(parameters[0]["required"], true);
+
+        // The body schema must exclude the path param entirely.
+        let body_schema = &op["requestBody"]["content"]["application/json"]["schema"];
+        assert!(body_schema["properties"]["id"].is_null(), "path param leaked into body properties");
+        assert!(body_schema["properties"]["name"].is_object(), "non-path field missing from body properties");
+        let required = body_schema["required"].as_array().unwrap();
+        assert!(!required.iter().any(|v| v == "id"), "path param leaked into body required list");
+        assert!(required.iter().any(|v| v == "name"));
     }
 }

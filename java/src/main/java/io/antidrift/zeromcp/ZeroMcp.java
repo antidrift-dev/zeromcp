@@ -330,10 +330,40 @@ public class ZeroMcp {
                 }
                 operation.add("parameters", parameters);
             } else {
+                if (!pathParamNames.isEmpty()) {
+                    var parameters = new JsonArray();
+                    for (var pathParamName : pathParamNames) {
+                        var param = new JsonObject();
+                        param.addProperty("name", pathParamName);
+                        param.addProperty("in", "path");
+                        param.addProperty("required", true);
+                        var paramSchema = new JsonObject();
+                        paramSchema.addProperty("type", "string");
+                        param.add("schema", paramSchema);
+                        parameters.add(param);
+                    }
+                    operation.add("parameters", parameters);
+                }
+
+                var bodySchema = new JsonObject();
+                bodySchema.addProperty("type", "object");
+                var properties = new JsonObject();
+                var required = new JsonArray();
+                for (var input : namedTool.tool().inputs()) {
+                    if (pathParamNames.contains(input.name())) continue;
+                    var prop = new JsonObject();
+                    prop.addProperty("type", input.type().jsonType());
+                    if (input.description() != null) prop.addProperty("description", input.description());
+                    properties.add(input.name(), prop);
+                    if (!input.optional()) required.add(input.name());
+                }
+                bodySchema.add("properties", properties);
+                bodySchema.add("required", required);
+
                 var requestBody = new JsonObject();
                 var content = new JsonObject();
                 var mediaType = new JsonObject();
-                mediaType.add("schema", namedTool.inputSchema());
+                mediaType.add("schema", bodySchema);
                 content.add("application/json", mediaType);
                 requestBody.add("content", content);
                 operation.add("requestBody", requestBody);

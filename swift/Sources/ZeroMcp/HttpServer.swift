@@ -243,17 +243,28 @@ extension ZeroMcp {
 
             if isBodyMethod {
                 var props: [String: Any] = [:]
-                for (key, prop) in schema.properties {
+                for (key, prop) in schema.properties where !pathParams.contains(key) {
                     var p: [String: Any] = ["type": prop.type]
                     if let desc = prop.description { p["description"] = desc }
                     props[key] = p
                 }
                 var bodySchema: [String: Any] = ["type": "object", "properties": props]
-                if !schema.required.isEmpty { bodySchema["required"] = schema.required }
+                let bodyRequired = schema.required.filter { !pathParams.contains($0) }
+                if !bodyRequired.isEmpty { bodySchema["required"] = bodyRequired }
                 operation["requestBody"] = [
                     "required": true,
                     "content": ["application/json": ["schema": bodySchema]] as [String: Any]
                 ] as [String: Any]
+                if !pathParams.isEmpty {
+                    operation["parameters"] = pathParams.sorted().map { key -> [String: Any] in
+                        [
+                            "name": key,
+                            "in": "path",
+                            "required": true,
+                            "schema": ["type": "string"]
+                        ]
+                    }
+                }
             } else {
                 var parameters: [[String: Any]] = []
                 for (key, prop) in schema.properties {

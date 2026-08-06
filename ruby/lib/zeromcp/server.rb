@@ -625,7 +625,17 @@ module ZeroMcp
         if route_method == 'GET'
           operation['parameters'] = build_openapi_parameters(input, path_param_names)
         else
-          operation['requestBody'] = build_openapi_request_body(input)
+          operation['requestBody'] = build_openapi_request_body(input, path_param_names)
+          unless path_param_names.empty?
+            operation['parameters'] = path_param_names.map do |name|
+              {
+                'name'     => name,
+                'in'       => 'path',
+                'required' => true,
+                'schema'   => { 'type' => 'string' }
+              }
+            end
+          end
         end
 
         paths[openapi_path] ||= {}
@@ -671,8 +681,9 @@ module ZeroMcp
       params
     end
 
-    def build_openapi_request_body(input)
-      schema = Schema.to_json_schema(input)
+    def build_openapi_request_body(input, path_param_names)
+      body_input = input.reject { |key, _| path_param_names.include?(key.to_s) }
+      schema = Schema.to_json_schema(body_input)
       {
         'required' => true,
         'content'  => {

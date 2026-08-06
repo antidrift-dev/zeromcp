@@ -932,6 +932,7 @@ public class ZeroMcpServer
                 var required = new List<string>();
                 foreach (var (fieldName, field) in tool.Input)
                 {
+                    if (pathParamNames.Contains(fieldName)) continue;
                     properties[fieldName] = BuildOpenApiPropertySchema(field);
                     if (!field.Optional) required.Add(fieldName);
                 }
@@ -944,6 +945,18 @@ public class ZeroMcpServer
                         ["application/json"] = new Dictionary<string, object> { ["schema"] = bodySchema }
                     }
                 };
+
+                if (pathParamNames.Count > 0)
+                {
+                    var parameters = pathParamNames.Select(name => (object)new Dictionary<string, object>
+                    {
+                        ["name"] = name,
+                        ["in"] = "path",
+                        ["required"] = true,
+                        ["schema"] = new Dictionary<string, object> { ["type"] = "string" }
+                    }).ToList();
+                    operation["parameters"] = parameters;
+                }
             }
 
             if (!paths.ContainsKey(openApiPath))

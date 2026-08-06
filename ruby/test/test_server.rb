@@ -310,4 +310,35 @@ class TestServer < Minitest::Test
     assert_equal 1, resp2['result']['tools'].length
     assert_nil resp2['result']['nextCursor']
   end
+
+  # --- OpenAPI spec ---
+
+  def test_openapi_non_get_route_documents_path_param
+    tool = ZeroMcp::Tool.new(
+      name: 'update_item',
+      description: 'Update an item',
+      input: {
+        'id' => 'string',
+        'name' => 'string'
+      },
+      route: { method: 'PUT', path: '/items/:id' }
+    ) { |_args, _ctx| {} }
+
+    @server.instance_variable_get(:@tools)['update_item'] = tool
+    spec = @server.send(:build_openapi_spec)
+    operation = spec['paths']['/items/{id}']['put']
+
+    # Path param is documented in `parameters`, not just buried in the body.
+    params = operation['parameters']
+    refute_nil params
+    id_param = params.find { |p| p['name'] == 'id' }
+    refute_nil id_param
+    assert_equal 'path', id_param['in']
+    assert_equal true, id_param['required']
+
+    # Path param is excluded from the request body schema.
+    body_props = operation['requestBody']['content']['application/json']['schema']['properties']
+    refute body_props.key?('id')
+    assert body_props.key?('name')
+  end
 end

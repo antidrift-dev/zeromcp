@@ -40,6 +40,7 @@ class ServerTest
         $this->testCompletionComplete();
         $this->testPagination();
         $this->testPaginationCursor();
+        $this->testOpenApiNonGetRoutePathParam();
 
         echo "\n{$this->passed} passed, {$this->failed} failed\n";
         if ($this->failed > 0) exit(1);
@@ -380,6 +381,36 @@ class ServerTest
         $secondName = $resp2['result']['tools'][0]['name'];
         $this->assert($firstName !== $secondName, 'cursor advances to different tool');
         $this->assert(count($resp2['result']['tools']) === 1, 'second page returns 1 tool');
+    }
+
+    private function testOpenApiNonGetRoutePathParam(): void
+    {
+        $config = new Config([
+            'tools' => __DIR__ . '/fixtures/tools',
+        ]);
+        $server = new Server($config);
+        $server->loadTools();
+
+        $method = new \ReflectionMethod(Server::class, 'buildOpenApiSpec');
+        $spec = $method->invoke($server);
+
+        $operation = $spec['paths']['/items/{id}']['put'] ?? null;
+        $this->assert($operation !== null, 'PUT /items/{id} present in openapi spec');
+
+        $parameters = $operation['parameters'] ?? [];
+        $this->assert(count($parameters) === 1, 'non-GET route documents exactly one path parameter');
+        $this->assert(
+            ($parameters[0] ?? null) === [
+                'name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'],
+            ],
+            'path parameter has correct shape'
+        );
+
+        $bodySchema = $operation['requestBody']['content']['application/json']['schema'] ?? [];
+        $this->assert($operation['requestBody']['required'] === true, 'requestBody is marked required');
+        $this->assert(!array_key_exists('id', $bodySchema['properties'] ?? []), 'path param excluded from body properties');
+        $this->assert(array_key_exists('name', $bodySchema['properties'] ?? []), 'non-path param still in body properties');
+        $this->assert(!in_array('id', $bodySchema['required'] ?? [], true), 'path param excluded from body required list');
     }
 }
 

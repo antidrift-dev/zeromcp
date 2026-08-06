@@ -596,8 +596,11 @@ private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<St
         val isGet = route.method == "GET"
 
         for ((fieldName, field) in tool.input) {
-            if (isGet) {
-                val location = if (fieldName in pathParams) "path" else "query"
+            val isPathParam = fieldName in pathParams
+            // GET: every field becomes a parameter (path or query).
+            // non-GET: only path-param fields become parameters; the rest go in requestBody below.
+            if (isGet || isPathParam) {
+                val location = if (isPathParam) "path" else "query"
                 val param = mutableMapOf<String, Any>(
                     "name" to fieldName,
                     "in" to location,
@@ -622,10 +625,27 @@ private fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<St
         if (!isGet && tool.input.isNotEmpty()) {
             val schema = schemas[tool.name]
             if (schema != null) {
+                // Path-param fields are already documented above via `parameters`;
+                // strip them out of the body schema so they aren't duplicated there too.
+                val bodySchema = if (pathParams.isEmpty()) {
+                    schema
+                } else {
+                    val properties = schema["properties"]?.jsonObject
+                        ?.filterKeys { it !in pathParams } ?: emptyMap()
+                    val required = schema["required"]?.jsonArray
+                        ?.filter { it.jsonPrimitive.content !in pathParams } ?: emptyList()
+                    buildJsonObject {
+                        put("type", "object")
+                        putJsonObject("properties") {
+                            for ((key, value) in properties) put(key, value)
+                        }
+                        put("required", JsonArray(required))
+                    }
+                }
                 operation["requestBody"] = mapOf(
                     "required" to true,
                     "content" to mapOf(
-                        "application/json" to mapOf("schema" to schema)
+                        "application/json" to mapOf("schema" to bodySchema)
                     )
                 )
             }

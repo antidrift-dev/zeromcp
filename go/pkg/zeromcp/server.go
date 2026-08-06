@@ -1037,6 +1037,9 @@ func (s *Server) buildOpenAPISpec() map[string]any {
 			props := map[string]any{}
 			required := []string{}
 			for fieldName, fieldDef := range rt.tool.Input {
+				if pathParamNames[fieldName] {
+					continue
+				}
 				props[fieldName] = fieldDefToOpenAPISchema(fieldDef)
 				if f, ok := fieldDef.(InputField); ok && f.Optional {
 					continue
@@ -1066,6 +1069,23 @@ func (s *Server) buildOpenAPISpec() map[string]any {
 					"200": map[string]any{"description": "Success"},
 					"500": map[string]any{"description": "Error"},
 				},
+			}
+			if len(pathParamNames) > 0 {
+				pathParams := make([]string, 0, len(pathParamNames))
+				for paramName := range pathParamNames {
+					pathParams = append(pathParams, paramName)
+				}
+				sort.Strings(pathParams)
+				params := make([]any, 0, len(pathParams))
+				for _, paramName := range pathParams {
+					params = append(params, map[string]any{
+						"name":     paramName,
+						"in":       "path",
+						"required": true,
+						"schema":   map[string]any{"type": "string"},
+					})
+				}
+				operation["parameters"] = params
 			}
 		}
 

@@ -558,3 +558,67 @@ func TestResponseSerializesToJSON(t *testing.T) {
 		t.Errorf("expected jsonrpc 2.0 in output")
 	}
 }
+
+func TestBuildOpenAPISpecNonGETPathParam(t *testing.T) {
+	s := NewServer()
+	s.Tool("updateItem", Tool{
+		Description: "Update an item",
+		Input: Input{
+			"id":   "string",
+			"name": "string",
+		},
+		Route: &RouteConfig{Method: "PUT", Path: "/items/:id"},
+		Execute: func(args map[string]any, ctx *Ctx) (any, error) {
+			return nil, nil
+		},
+	})
+
+	spec := s.buildOpenAPISpec()
+	paths, ok := spec["paths"].(map[string]any)
+	if !ok {
+		t.Fatal("expected paths map")
+	}
+	pathItem, ok := paths["/items/{id}"].(map[string]any)
+	if !ok {
+		t.Fatal("expected /items/{id} path item")
+	}
+	operation, ok := pathItem["put"].(map[string]any)
+	if !ok {
+		t.Fatal("expected put operation")
+	}
+
+	// The path param must be documented via a "parameters" array, not the body.
+	params, ok := operation["parameters"].([]any)
+	if !ok || len(params) != 1 {
+		t.Fatalf("expected 1 path parameter, got %v", operation["parameters"])
+	}
+	param, ok := params[0].(map[string]any)
+	if !ok {
+		t.Fatal("expected parameter object")
+	}
+	if param["name"] != "id" || param["in"] != "path" || param["required"] != true {
+		t.Errorf("unexpected path parameter shape: %v", param)
+	}
+
+	// The body schema must exclude the path param and only contain "name".
+	reqBody, ok := operation["requestBody"].(map[string]any)
+	if !ok {
+		t.Fatal("expected requestBody")
+	}
+	content := reqBody["content"].(map[string]any)
+	appJSON := content["application/json"].(map[string]any)
+	schema := appJSON["schema"].(map[string]any)
+	props := schema["properties"].(map[string]any)
+	if _, exists := props["id"]; exists {
+		t.Error("expected \"id\" to be excluded from body properties")
+	}
+	if _, exists := props["name"]; !exists {
+		t.Error("expected \"name\" to be included in body properties")
+	}
+	required, _ := schema["required"].([]string)
+	for _, r := range required {
+		if r == "id" {
+			t.Error("expected \"id\" to be excluded from body required list")
+		}
+	}
+}
