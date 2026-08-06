@@ -58,7 +58,7 @@ export class RemoteManager {
       jsonrpc: '2.0', id: 2, method: 'tools/list', params: {}
     }, auth);
 
-    const remoteTools = listRes?.result?.tools as RemoteTool[] || [];
+    const remoteTools = (listRes?.result?.tools as RemoteTool[] || []).filter((tool) => !server.tools || server.tools.includes(tool.name));
 
     for (const rt of remoteTools) {
       const input = this.schemaToInput(rt.inputSchema);

@@ -88,6 +88,27 @@ public class ZeroMcp {
     }
 
     /**
+     * Build a framework-neutral registry snapshot of the currently-registered,
+     * route-annotated tools plus a JSON-RPC dispatcher, for embedding into a
+     * caller-owned HTTP framework instead of ZeroMcp's built-in server.
+     * Call this after all {@link #tool} registrations are done, same as
+     * {@link #serve} / {@link #serveHttp}.
+     */
+    public Registry registry() {
+        return new Registry(routeDefinitions(), buildOpenApiSpec(), this::handleRequest);
+    }
+
+    private List<RouteDefinition> routeDefinitions() {
+        var routes = new ArrayList<RouteDefinition>();
+        for (var namedTool : tools.values()) {
+            var route = namedTool.tool().route();
+            if (route == null) continue;
+            routes.add(new RouteDefinition(namedTool.name(), route.method(), route.path(), namedTool.tool()));
+        }
+        return List.copyOf(routes);
+    }
+
+    /**
      * Register a static resource.
      */
     public void resource(String name, ResourceDef resource) {

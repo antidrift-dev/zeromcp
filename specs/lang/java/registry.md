@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Java port design for the framework-neutral registry shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md`). No code has been written yet; class/method names below are the target design, not existing API.
+**Shipped**, on branch `registry/java`. Implemented exactly as designed below: `Registry.java`, `RouteDefinition.java`, `McpHandler.java` (new records/functional interface), and `ZeroMcp.registry()`/`routeDefinitions()` on the existing `ZeroMcp.java`, reusing `buildOpenApiSpec()` and `handleRequest` with no duplicated logic. `buildOpenApiSpec()` stayed `private` (no visibility change needed — `registry()` lives in the same class). Covered by 7 new tests in `RegistryTest.java` (route filtering, insertion-order preservation, OpenAPI parity, direct tool invocation, `mcp` dispatch for `tools/list` and `tools/call`, empty-routes case). `mvn compile`, `mvn package -DskipTests`, and `mvn test` all pass (84 tests total, zero regressions).
 
 ## Motivation
 
