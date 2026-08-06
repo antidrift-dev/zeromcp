@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Go port design for the framework-neutral tool registry shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md`). Nothing in this file exists in `go/` yet; it's a design for a Go engineer to implement.
+**Shipped**, on branch `registry/go`. Implemented exactly as designed below: `go/pkg/zeromcp/registry.go` adds `(*Server).Registry()`, reusing `s.buildOpenAPISpec()` and `s.HandleRequestBytes` with no duplicated logic. Covered by `go/pkg/zeromcp/registry_test.go` (6 tests: route filtering, deterministic sort order, `Invoke` context resolution, `OpenAPI`/`buildOpenAPISpec()` parity, `MCP` JSON-RPC dispatch, empty-routes case). `go build ./pkg/...`, `go vet ./pkg/...`, and `go test ./pkg/...` all pass.
 
 ## Motivation
 
