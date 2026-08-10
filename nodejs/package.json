@@ -35,6 +35,7 @@
     }
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc",
     "test": "node --test test/*.test.js"
   },
