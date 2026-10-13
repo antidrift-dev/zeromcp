@@ -1,7 +1,7 @@
 # Node parity — Ruby
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: Ruby unit suite 167 runs / 0 failures (new `test_remote.rb`, `test_autoload.rb`, plus remote/runtime/sources/icon cases in existing files); Ruby conformance suites all pass.
 
 ## Gaps
 1. Remote federation (`remote` config) in `Server` (serve, serve_http, load_tools + handle_request)

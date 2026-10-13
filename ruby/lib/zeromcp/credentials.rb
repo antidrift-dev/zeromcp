@@ -6,11 +6,18 @@ module ZeroMcp
   module Credentials
     module_function
 
-    def resolve(tool_name, config, cache: nil)
+    # ns: the credentials key to use (a scanned tool's top-level directory).
+    # When nil, the key is found by matching the tool name's prefix.
+    def resolve(tool_name, config, cache: nil, ns: nil)
       return nil if config.credentials.empty?
-      config.credentials.each do |ns, source|
-        if tool_name.start_with?("#{ns}_") || tool_name.start_with?("#{ns}#{config.separator}")
-          return resolve_for_ns(ns.to_s, source, config, cache)
+      if ns
+        key = config.credentials.key?(ns) ? ns : (config.credentials.key?(ns.to_sym) ? ns.to_sym : nil)
+        return nil unless key
+        return resolve_for_ns(ns.to_s, config.credentials[key], config, cache)
+      end
+      config.credentials.each do |key, source|
+        if tool_name.start_with?("#{key}_") || tool_name.start_with?("#{key}#{config.separator}")
+          return resolve_for_ns(key.to_s, source, config, cache)
         end
       end
       nil

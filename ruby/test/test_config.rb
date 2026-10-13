@@ -137,4 +137,78 @@ class TestConfig < Minitest::Test
   def test_resolve_icon_missing_file
     assert_nil ZeroMcp::Config.resolve_icon('/nonexistent/icon.png')
   end
+
+  # --- Icon from an http(s) URL ---
+
+  def with_icon_server
+    require 'webrick'
+    server = WEBrick::HTTPServer.new(Port: 0, BindAddress: '127.0.0.1', Logger: WEBrick::Log.new(File::NULL), AccessLog: [])
+    server.mount_proc('/icon.png') do |_req, res|
+      res.content_type = 'image/png'
+      res.body = "\x89PNG\r\n\x1a\nfake".b
+    end
+    thread = Thread.new { server.start }
+    yield "http://127.0.0.1:#{server.config[:Port]}"
+  ensure
+    server&.shutdown
+    thread&.join(2)
+  end
+
+  def test_resolve_icon_from_url
+    with_icon_server do |base|
+      result = ZeroMcp::Config.resolve_icon("#{base}/icon.png")
+      prefix = 'data:image/png;base64,'
+      assert result.start_with?(prefix), result
+      assert_equal "\x89PNG\r\n\x1a\nfake".b, Base64.strict_decode64(result[prefix.length..])
+    end
+  end
+
+  def test_resolve_icon_url_404_warns_and_returns_nil
+    with_icon_server do |base|
+      result = :unset
+      _, err = capture_io { result = ZeroMcp::Config.resolve_icon("#{base}/missing.png") }
+      assert_nil result
+      assert_includes err, "[zeromcp] Warning: failed to fetch icon #{base}/missing.png: 404"
+    end
+  end
+
+  # --- Tool sources ---
+
+  def test_tool_sources_mixed_entries
+    config = ZeroMcp::Config.new('tools' => ['./a', { 'path' => './b', 'prefix' => 'x' }, { path: './c' }])
+    assert_equal [
+      { 'path' => './a', 'prefix' => nil },
+      { 'path' => './b', 'prefix' => 'x' },
+      { 'path' => './c', 'prefix' => nil }
+    ], config.tool_sources
+    assert_equal ['./a', './b', './c'], config.tools_dir
+  end
+
+  def test_tool_sources_default
+    assert_equal [{ 'path' => './tools', 'prefix' => nil }], ZeroMcp::Config.new.tool_sources
+  end
+
+  def test_resources_and_prompts_accept_source_hashes
+    config = ZeroMcp::Config.new(
+      'resources' => [{ 'path' => '/r', 'prefix' => 'ignored' }, '/r2'],
+      'prompts' => { 'path' => '/p' }
+    )
+    assert_equal ['/r', '/r2'], config.resources_dir
+    assert_equal ['/p'], config.prompts_dir
+  end
+
+  def test_remote_and_transport_readers
+    config = ZeroMcp::Config.new('remote' => [{ 'name' => 'a', 'url' => 'http://x' }], 'transport' => 'stdio')
+    assert_equal [{ 'name' => 'a', 'url' => 'http://x' }], config.remote
+    assert_equal [], ZeroMcp::Config.new.remote
+    refute config.http_transport?
+  end
+
+  def test_http_transport_detection
+    assert ZeroMcp::Config.new('transport' => 'http').http_transport?
+    assert ZeroMcp::Config.new('transport' => { 'type' => 'http', 'port' => 1 }).http_transport?
+    assert ZeroMcp::Config.new('transport' => [{ 'type' => 'stdio' }, { 'type' => 'http' }]).http_transport?
+    refute ZeroMcp::Config.new('transport' => [{ 'type' => 'stdio' }]).http_transport?
+    refute ZeroMcp::Config.new.http_transport?
+  end
 end

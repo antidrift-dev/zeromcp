@@ -8,17 +8,24 @@ require_relative 'config'
 require_relative 'tool'
 require_relative 'scanner'
 require_relative 'sandbox'
-require_relative 'openapi'
 require_relative 'credentials'
+require_relative 'remote'
 
 module ZeroMcp
   class Server
-    def initialize(config = nil, tools: nil)
+    HTTP_REMOVED_MESSAGE = '[zeromcp] The built-in HTTP transport was removed. Mount ZeroMcp.create_registry ' \
+                           '(routes, openapi, mcp) or ZeroMcp::Server#handle_request in your own HTTP server.'
+
+    # get_runtime: optional callable (lambda/proc/method), arity 0. Called on
+    # every local tool execution; its return value becomes ctx.runtime.
+    def initialize(config = nil, tools: nil, get_runtime: nil)
       @config = config || Config.load
       @scanner = Scanner.new(@config)
       @resource_scanner = ResourceScanner.new(@config)
       @prompt_scanner = PromptScanner.new(@config)
       @tools = tools || {}
+      @remote_names = {}
+      @get_runtime = get_runtime
       @resources = {}
       @templates = {}
       @prompts = {}
@@ -26,97 +33,41 @@ module ZeroMcp
       @log_level = 'info'
       @icon = tools ? Config.resolve_icon(@config.icon) : nil
       @credential_cache = {}
+      @out_mutex = Mutex.new
+      @notify = nil
+      @autoload_thread = nil
     end
 
-    # Start an HTTP server that exposes:
-    #   POST /mcp  — JSON-RPC over HTTP
-    #   <method> <path> — per-tool route handlers (tools with a `route:` field)
-    #
-    # Usage: ZeroMcp::Server.new.serve_http(port: 3000)
-    def serve_http(port: 3000)
-      require_webrick
-      load_tools
-
-      http = WEBrick::HTTPServer.new(Port: port, Logger: WEBrick::Log.new($stderr), AccessLog: [])
-      $stderr.puts "[zeromcp] HTTP server listening on port #{port}"
-
-      # /mcp — JSON-RPC endpoint
-      http.mount_proc('/mcp') do |req, res|
-        begin
-          request = JSON.parse(req.body || '{}')
-        rescue JSON::ParserError
-          res.status = 400
-          res.content_type = 'application/json'
-          res.body = JSON.generate({ 'error' => 'Invalid JSON' })
-          next
-        end
-        response = handle_request(request)
-        res.content_type = 'application/json'
-        res.body = JSON.generate(response || {})
-      end
-
-      # /openapi.json — auto-generated OpenAPI 3.0 spec from routed tools
-      http.mount_proc('/openapi.json') do |_req, res|
-        res.content_type = 'application/json'
-        res.body = JSON.generate(build_openapi_spec)
-      end
-
-      # /docs — Swagger UI
-      http.mount_proc('/docs') do |_req, res|
-        res.content_type = 'text/html'
-        res.body = SWAGGER_UI_HTML
-      end
-
-      # /health — liveness check
-      http.mount_proc('/health') do |_req, res|
-        res.content_type = 'application/json'
-        res.body = JSON.generate({ 'ok' => true })
-      end
-
-      # Register per-tool HTTP routes
-      @tools.each do |_name, tool|
-        next unless tool.route.is_a?(Hash)
-        register_tool_route(http, tool, tool.route_method, tool.route_path)
-      end
-
-      trap('INT')  { http.shutdown }
-      trap('TERM') { http.shutdown }
-      http.start
-    end
-
-    # Load tools (and resources/prompts) from the configured directories.
+    # Load tools (remote + local), resources and prompts from the config.
     # Call this before using handle_request directly (serve calls this
-    # automatically).
+    # automatically). A local scan error propagates.
     def load_tools
-      @tools = @scanner.scan
-      @resource_scanner.scan
-      @resources = @resource_scanner.resources
-      @templates = @resource_scanner.templates
-      @prompt_scanner.scan
-      @prompts = @prompt_scanner.prompts
-      @icon = Config.resolve_icon(@config.icon)
+      @tools = build_tool_map(@scanner.scan)
+      load_resources_and_prompts
+    end
 
-      resource_count = @resources.size + @templates.size
-      $stderr.puts "[zeromcp] #{@tools.size} tool(s), #{resource_count} resource(s), #{@prompts.size} prompt(s)"
+    # Merge remote tools under the current tool map: local tools win, logging
+    # each override. Returns the merged map. Used by Registry.
+    def attach_remote(remote_tools)
+      @tools = merge_remote(remote_tools, @tools)
     end
 
     def serve
+      if @config.http_transport?
+        $stderr.puts HTTP_REMOVED_MESSAGE
+        exit 1
+      end
+
       $stdout.sync = true
       $stderr.sync = true
       $stdin.set_encoding('UTF-8')
       $stdout.set_encoding('UTF-8')
 
-      @tools = @scanner.scan
-      @resource_scanner.scan
-      @resources = @resource_scanner.resources
-      @templates = @resource_scanner.templates
-      @prompt_scanner.scan
-      @prompts = @prompt_scanner.prompts
-      @icon = Config.resolve_icon(@config.icon)
-
-      resource_count = @resources.size + @templates.size
-      $stderr.puts "[zeromcp] #{@tools.size} tool(s), #{resource_count} resource(s), #{@prompts.size} prompt(s)"
+      load_for_serve
       $stderr.puts "[zeromcp] stdio transport ready"
+
+      @notify = ->(method, params) { write_message({ 'jsonrpc' => '2.0', 'method' => method, 'params' => params }) }
+      start_autoload if @config.autoload_tools
 
       $stdin.each_line do |line|
         begin
@@ -135,11 +86,10 @@ module ZeroMcp
         next unless request.is_a?(Hash)
 
         response = handle_request(request)
-        if response
-          $stdout.puts JSON.generate(response)
-          $stdout.flush
-        end
+        write_message(response) if response
       end
+    ensure
+      stop_autoload
     end
 
     # Process a single JSON-RPC request hash and return a response hash.
@@ -481,7 +431,9 @@ module ZeroMcp
       end
 
       begin
-        ctx = Context.new(tool_name: name, permissions: tool.permissions, bypass: @config.bypass_permissions, credentials: _resolve_credentials(name))
+        ctx = Context.new(tool_name: name, permissions: tool.permissions, bypass: @config.bypass_permissions,
+                          credentials: _resolve_credentials(tool, name),
+                          runtime: @remote_names.key?(name) ? nil : @get_runtime&.call)
 
         # Tool-level timeout overrides config default
         timeout_secs = (tool.permissions.is_a?(Hash) && tool.permissions[:execute_timeout]) ||
@@ -498,104 +450,124 @@ module ZeroMcp
       end
     end
 
-    def _resolve_credentials(tool_name)
-      Credentials.resolve(tool_name, @config, cache: @credential_cache)
+    def _resolve_credentials(tool, tool_name)
+      Credentials.resolve(tool_name, @config, cache: @credential_cache, ns: tool.credentials_ns)
     end
 
-    # --- HTTP route helpers ---
+    # --- Loading ---
 
-    # webrick left the standard library in Ruby 3.0. Load it only for the HTTP
-    # transport so stdio, handle_request and Registry work without it.
-    def require_webrick
-      require 'webrick'
-    rescue LoadError
-      raise LoadError, 'webrick is required for the HTTP transport: gem install webrick (or add it to your Gemfile)'
+    # Remote tools first, then local tools over them (Node: server.ts / handler.ts).
+    def build_tool_map(local_tools)
+      @remote_names = {}
+      remote = @config.remote.empty? ? {} : Remote.connect(@config.remote)
+      merge_remote(remote, local_tools)
     end
 
-    def register_tool_route(http, tool, route_method, route_path)
-      # Convert :param segments to a regex for matching
-      param_names = []
-      regex_str = route_path.gsub(/:([A-Za-z_][A-Za-z0-9_]*)/) do
-        param_names << $1
-        '([^/]+)'
+    def merge_remote(remote_tools, local_tools)
+      merged = {}
+      remote_tools.each { |name, tool| merged[name] = tool }
+      local_tools.each do |name, tool|
+        $stderr.puts "[zeromcp] Local tool \"#{name}\" overrides remote" if remote_tools.key?(name)
+        merged[name] = tool
       end
-      route_regex = /\A#{regex_str}\z/
+      remote_tools.each_key { |name| @remote_names[name] = true unless local_tools.key?(name) }
+      merged
+    end
 
-      http.mount_proc(route_path_prefix(route_path)) do |req, res|
-        next unless req.request_method == route_method
+    # serve's loading path: like load_tools, but a failing local scan only
+    # exits when there is nothing else to serve (Node: server.ts).
+    def load_for_serve
+      local = begin
+        @scanner.scan
+      rescue StandardError
+        if @config.remote.empty? && @config.resources_dir.empty? && @config.prompts_dir.empty?
+          $stderr.puts '[zeromcp] No tools directory and no remote servers configured'
+          exit 1
+        end
+        {}
+      end
+      @tools = build_tool_map(local)
+      load_resources_and_prompts
+    end
 
-        path_params = extract_path_params(req.path, route_regex, param_names)
-        unless path_params
-          res.status = 404
-          res.content_type = 'application/json'
-          res.body = JSON.generate({ 'ok' => false, 'error' => 'Not found' })
+    def load_resources_and_prompts
+      @resource_scanner.scan
+      @resources = @resource_scanner.resources
+      @templates = @resource_scanner.templates
+      @prompt_scanner.scan
+      @prompts = @prompt_scanner.prompts
+      @icon = Config.resolve_icon(@config.icon)
+
+      resource_count = @resources.size + @templates.size
+      $stderr.puts "[zeromcp] #{@tools.size} tool(s), #{resource_count} resource(s), #{@prompts.size} prompt(s)"
+    end
+
+    # --- Output ---
+
+    # Stdout is shared by the stdin loop and the autoload watcher thread.
+    def write_message(message)
+      @out_mutex.synchronize do
+        $stdout.puts JSON.generate(message)
+        $stdout.flush
+      end
+    end
+
+    # --- Hot reload (autoload_tools) ---
+
+    # Ruby's stdlib has no recursive file watcher, so poll mtimes of every
+    # .rb file under each tool source. On a change: rescan, set every
+    # rescanned tool into the live map (never removing entries, as Node does),
+    # and send notifications/tools/list_changed when stdio is running.
+    def start_autoload(interval: 1.0)
+      snapshot = tool_file_snapshot
+      @autoload_thread = Thread.new do
+        loop do
+          sleep interval
+          current = tool_file_snapshot
+          changed = (current.keys | snapshot.keys).reject { |k| current[k] == snapshot[k] }
+          snapshot_was = snapshot
+          snapshot = current
+          next if changed.empty?
+
+          changed.sort.each { |path| $stderr.puts "[zeromcp] Change detected: #{(current[path] || snapshot_was[path])[0]}" }
+          reload_tools
+        rescue StandardError => e
+          $stderr.puts "[zeromcp] autoload error: #{e.message}"
+        end
+      end
+      $stderr.puts '[zeromcp] autoload_tools enabled — watching for changes'
+      @autoload_thread
+    end
+
+    def stop_autoload
+      @autoload_thread&.kill
+      @autoload_thread = nil
+    end
+
+    def reload_tools
+      rescanned = @scanner.scan.dup
+      tools = @tools.dup
+      rescanned.each do |name, tool|
+        tools[name] = tool
+        @remote_names.delete(name)
+      end
+      @tools = tools
+      @notify&.call('notifications/tools/list_changed', {})
+    end
+
+    # { <absolute path> => [<path relative to its source>, mtime] } for every tool file.
+    def tool_file_snapshot
+      snap = {}
+      @scanner.source_dirs.each do |dir|
+        next unless Dir.exist?(dir)
+        Dir.glob('**/*.rb', base: dir).each do |rel|
+          full = File.join(dir, rel)
+          snap[full] = [rel, File.mtime(full)]
+        rescue StandardError
           next
         end
-
-        args = if route_method == 'GET'
-          query_args = WEBrick::HTTPUtils.parse_query(req.query_string || '')
-          query_args.merge(path_params)
-        else
-          body_args = begin
-            req.body && !req.body.empty? ? JSON.parse(req.body) : {}
-          rescue JSON::ParserError
-            {}
-          end
-          body_args.merge(path_params)
-        end
-
-        begin
-          ctx = Context.new(tool_name: tool.name, permissions: tool.permissions,
-                            bypass: @config.bypass_permissions,
-                            credentials: _resolve_credentials(tool.name))
-          timeout_secs = (tool.permissions.is_a?(Hash) && tool.permissions[:execute_timeout]) ||
-                         (tool.permissions.is_a?(Hash) && tool.permissions['execute_timeout']) ||
-                         @config.execute_timeout
-          result = Timeout.timeout(timeout_secs) { tool.call(args, ctx) }
-          res.content_type = 'application/json'
-          res.body = JSON.generate({ 'ok' => true, 'result' => result })
-        rescue => e
-          res.status = 500
-          res.content_type = 'application/json'
-          res.body = JSON.generate({ 'ok' => false, 'error' => e.message })
-        end
       end
+      snap
     end
-
-    def route_path_prefix(route_path)
-      # WEBrick mounts on a fixed prefix; use the static prefix before first :param
-      route_path.split('/:').first || '/'
-    end
-
-    def extract_path_params(path, route_regex, param_names)
-      m = path.match(route_regex)
-      return nil unless m
-      result = {}
-      param_names.each_with_index { |name, i| result[name] = m[i + 1] }
-      result
-    end
-
-    # --- OpenAPI spec builder ---
-
-    def build_openapi_spec
-      OpenApi.build(@tools, @config)
-    end
-
-    SWAGGER_UI_HTML = <<~HTML.freeze
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>ZeroMCP API</title>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
-      </head>
-      <body>
-      <div id="swagger-ui"></div>
-      <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
-      <script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-      </body>
-      </html>
-    HTML
   end
 end

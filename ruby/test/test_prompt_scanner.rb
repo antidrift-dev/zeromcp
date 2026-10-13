@@ -78,4 +78,11 @@ class TestPromptScanner < Minitest::Test
     scanner.scan
     assert_empty scanner.prompts
   end
+
+  def test_path_hash_entries_load
+    config = ZeroMcp::Config.new('prompts' => [{ 'path' => File.join(__dir__, 'fixtures', 'prompts') }])
+    scanner = ZeroMcp::PromptScanner.new(config)
+    capture_io { scanner.scan }
+    assert scanner.prompts.key?('greet')
+  end
 end
