@@ -161,4 +161,83 @@ public class RegistryTests
 
         Assert.Empty(registry.Routes);
     }
+
+    // --- Remote (CreateAsync) ---
+
+    private static RegistryOptions RemoteOptions(StubMcpServer stub) => new()
+    {
+        Remote = new() { new RemoteServer { Name = "probeo", Url = stub.Url } }
+    };
+
+    [Fact]
+    public async Task CreateAsync_FederatesRemoteTools()
+    {
+        using var stub = new StubMcpServer();
+        var registry = await Registry.CreateAsync(new Dictionary<string, ToolDefinition>(), RemoteOptions(stub));
+
+        var listed = await registry.Mcp(MakeRequest("tools/list"));
+        var tools = (List<Dictionary<string, object>>)((Dictionary<string, object>)listed!["result"]!)["tools"];
+        Assert.Contains(tools, t => (string)t["name"] == "probeo.list_pages");
+
+        var called = await registry.Mcp(MakeRequest("tools/call", new
+        {
+            name = "probeo.list_pages",
+            arguments = new { domain = "example.com" }
+        }));
+        var content = (List<Dictionary<string, string>>)((Dictionary<string, object>)called!["result"]!)["content"];
+        Assert.Equal(StubMcpServer.CallText, content[0]["text"]);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RoutesAndOpenApiExcludeRemote()
+    {
+        using var stub = new StubMcpServer();
+        var registry = await Registry.CreateAsync(new Dictionary<string, ToolDefinition>(), RemoteOptions(stub));
+
+        Assert.Empty(registry.Routes);
+        Assert.Empty((Dictionary<string, object>)registry.OpenApi["paths"]);
+    }
+
+    [Fact]
+    public void Create_WithRemote_Throws()
+    {
+        var options = new RegistryOptions
+        {
+            Remote = new() { new RemoteServer { Name = "probeo", Url = "http://127.0.0.1:1/" } }
+        };
+        Assert.Throws<InvalidOperationException>(() =>
+            Registry.Create(new Dictionary<string, ToolDefinition>(), options));
+    }
+}
+
+[Collection("Stderr")]
+public class RegistryRemoteOverrideTests
+{
+    [Fact]
+    public async Task CreateAsync_LocalToolOverridesRemote()
+    {
+        using var stub = new StubMcpServer();
+        using var err = new StderrCapture();
+        var registry = await Registry.CreateAsync(new Dictionary<string, ToolDefinition>
+        {
+            ["probeo.list_pages"] = new ToolDefinition
+            {
+                Description = "local",
+                Input = new() { ["domain"] = new InputField(SimpleType.String) },
+                Execute = (_, _) => Task.FromResult<object>("local result")
+            }
+        }, new RegistryOptions { Remote = new() { new RemoteServer { Name = "probeo", Url = stub.Url } } });
+
+        var request = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 1,
+            method = "tools/call",
+            @params = new { name = "probeo.list_pages", arguments = new { domain = "x" } }
+        }));
+        var called = await registry.Mcp(request);
+        var content = (List<Dictionary<string, string>>)((Dictionary<string, object>)called!["result"]!)["content"];
+        Assert.Equal("local result", content[0]["text"]);
+        Assert.Contains("overrides remote", err.Text);
+    }
 }

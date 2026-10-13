@@ -130,4 +130,41 @@ public class PaginationTests
         Assert.Single(prompts);
         Assert.True(result1.ContainsKey("nextCursor"));
     }
+
+    [Fact]
+    public async Task ConfigPageSize_Paginates()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig { PageSize = 2 });
+        for (int i = 0; i < 5; i++) server.Tool($"tool_{i}", $"Tool {i}");
+
+        var resp = await server.HandleRequest(MakeRequest("tools/list"));
+        var result = (Dictionary<string, object>)resp!["result"]!;
+        Assert.Equal(2, ((List<Dictionary<string, object>>)result["tools"]).Count);
+        Assert.True(result.ContainsKey("nextCursor"));
+    }
+
+    [Fact]
+    public async Task ExplicitPageSize_OverridesConfig()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig { PageSize = 2 }, pageSize: 1);
+        for (int i = 0; i < 5; i++) server.Tool($"tool_{i}", $"Tool {i}");
+
+        var resp = await server.HandleRequest(MakeRequest("tools/list"));
+        var result = (Dictionary<string, object>)resp!["result"]!;
+        Assert.Single((List<Dictionary<string, object>>)result["tools"]);
+    }
+
+    [Fact]
+    public void ConfigPageSize_ParsedFromJson()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "{\"page_size\": 3, \"icon\": \"data:image/png;base64,AA==\"}");
+            var config = ZeroMcpConfig.Load(path);
+            Assert.Equal(3, config.PageSize);
+            Assert.Equal("data:image/png;base64,AA==", config.Icon);
+        }
+        finally { File.Delete(path); }
+    }
 }

@@ -10,17 +10,26 @@ public class ZeroMcpServer
     private readonly Dictionary<string, ResourceTemplateDefinition> _templates = new();
     private readonly Dictionary<string, PromptDefinition> _prompts = new();
     private readonly HashSet<string> _subscriptions = new();
+    private readonly HashSet<string> _remoteTools = new();
     private readonly ZeroMcpConfig _config;
     private string _logLevel = "info";
     private int _pageSize;
+    private readonly object _prepareLock = new();
+    private Task? _prepare;
 
     /// <summary>Optional icon URI applied to all list entries.</summary>
     public string? Icon { get; set; }
 
     /// <summary>
+    /// Called on every local tool execution; the result is set as ctx.Runtime.
+    /// Not consulted when the context is built by the registry's GetContext.
+    /// </summary>
+    public Func<object?>? GetRuntime { get; set; }
+
+    /// <summary>
     /// Optional override for building the ToolContext passed to a tool's Execute
     /// during tools/call dispatch. Null (the default) preserves existing behavior
-    /// for Serve()/ServeHttp(); set by Registry.Create when RegistryOptions.GetContext
+    /// for Serve() and HandleRequest; set by Registry.Create when RegistryOptions.GetContext
     /// is supplied.
     /// </summary>
     internal Func<string, Permissions?, ToolContext>? ContextFactory { get; set; }
@@ -35,12 +44,13 @@ public class ZeroMcpServer
     public ZeroMcpServer(ZeroMcpConfig? config = null, int pageSize = 0)
     {
         _config = config ?? ZeroMcpConfig.Load();
-        _pageSize = pageSize;
+        _pageSize = pageSize != 0 ? pageSize : _config.PageSize ?? 0;
     }
 
     public void Tool(string name, ToolDefinition tool)
     {
         tool.CachedSchema = Schema.ToJsonSchema(tool.Input);
+        TakeOverRemote(name);
         _tools[name] = tool;
     }
 
@@ -59,7 +69,59 @@ public class ZeroMcpServer
             Route = route
         };
         def.CachedSchema = Schema.ToJsonSchema(def.Input);
+        TakeOverRemote(name);
         _tools[name] = def;
+    }
+
+    /// <summary>A local tool registered under a remote tool's name replaces it.</summary>
+    private void TakeOverRemote(string name)
+    {
+        if (_remoteTools.Remove(name))
+            Console.Error.WriteLine($"[zeromcp] Local tool \"{name}\" overrides remote");
+    }
+
+    // --- Remote federation ---
+
+    /// <summary>
+    /// Connect remote MCP servers and add their tools as "&lt;server&gt;.&lt;tool&gt;".
+    /// A local tool already registered under the same name wins.
+    /// </summary>
+    internal async Task ConnectRemotes(IEnumerable<RemoteServer> servers)
+    {
+        var remote = await RemoteManager.Connect(servers);
+        foreach (var (name, tool) in remote)
+        {
+            if (_tools.ContainsKey(name) && !_remoteTools.Contains(name))
+            {
+                Console.Error.WriteLine($"[zeromcp] Local tool \"{name}\" overrides remote");
+                continue;
+            }
+            tool.CachedSchema = Schema.ToJsonSchema(tool.Input);
+            _tools[name] = tool;
+            _remoteTools.Add(name);
+        }
+    }
+
+    /// <summary>
+    /// Connects config "remote" servers and resolves config "icon".
+    /// Idempotent: concurrent and repeat calls await the same Task.
+    /// Called automatically by Serve(); embedders calling HandleRequest directly await it once.
+    /// </summary>
+    public Task Prepare()
+    {
+        lock (_prepareLock)
+        {
+            return _prepare ??= PrepareCore();
+        }
+    }
+
+    private async Task PrepareCore()
+    {
+        if (_config.Remote is { Count: > 0 })
+            await ConnectRemotes(_config.Remote);
+
+        if (Icon == null && !string.IsNullOrEmpty(_config.Icon))
+            Icon = await ZeroMcpConfig.ResolveIcon(_config.Icon);
     }
 
     // --- Resource registration ---
@@ -117,6 +179,14 @@ public class ZeroMcpServer
 
     public async Task Serve()
     {
+        if (RequestsHttpTransport(_config.Transport))
+        {
+            throw new InvalidOperationException(
+                "zeromcp: the built-in HTTP transport was removed. Mount Registry.Create(tools) (Routes, OpenApi, Mcp) or ZeroMcpServer.HandleRequest in your own HTTP server.");
+        }
+
+        await Prepare();
+
         Console.Error.WriteLine($"[zeromcp] {_tools.Count} tool(s), {_resources.Count + _templates.Count} resource(s), {_prompts.Count} prompt(s) loaded");
         Console.Error.WriteLine("[zeromcp] stdio transport ready");
 
@@ -163,203 +233,23 @@ public class ZeroMcpServer
         }
     }
 
-    /// <summary>
-    /// Start an HTTP server that exposes route-based endpoints for tools with a Route defined,
-    /// plus a /mcp POST endpoint for raw JSON-RPC requests.
-    /// </summary>
-    public async Task ServeHttp(int port = 3000)
+    /// <summary>True when config "transport" is, or contains, an object whose type is "http".</summary>
+    private static bool RequestsHttpTransport(JsonElement? transport)
     {
-        var prefix = $"http://+:{port}/";
-        var listener = new System.Net.HttpListener();
-        listener.Prefixes.Add(prefix);
-        listener.Start();
-        Console.Error.WriteLine($"[zeromcp] HTTP server listening on port {port}");
+        if (transport is not { } t) return false;
 
-        while (true)
+        static bool IsHttp(JsonElement e) =>
+            e.ValueKind == JsonValueKind.Object &&
+            e.TryGetProperty("type", out var type) &&
+            type.ValueKind == JsonValueKind.String &&
+            type.GetString() == "http";
+
+        return t.ValueKind switch
         {
-            var ctx = await listener.GetContextAsync();
-            _ = HandleHttpContext(ctx);
-        }
-    }
-
-    private async Task HandleHttpContext(System.Net.HttpListenerContext ctx)
-    {
-        var req = ctx.Request;
-        var res = ctx.Response;
-        res.ContentType = "application/json";
-
-        try
-        {
-            var method = req.HttpMethod.ToUpperInvariant();
-            var rawPath = req.Url?.AbsolutePath ?? "/";
-
-            // /mcp — raw JSON-RPC passthrough
-            if (rawPath == "/mcp" && method == "POST")
-            {
-                using var sr = new StreamReader(req.InputStream);
-                var body = await sr.ReadToEndAsync();
-                var doc = JsonDocument.Parse(body);
-                var rpcResponse = await HandleRequest(doc);
-                var json = rpcResponse != null
-                    ? JsonSerializer.Serialize(rpcResponse, JsonOptions)
-                    : "{}";
-                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-                res.StatusCode = 200;
-                await res.OutputStream.WriteAsync(bytes);
-                res.OutputStream.Close();
-                return;
-            }
-
-            // /openapi.json — auto-generated OpenAPI 3.0 spec
-            if (rawPath == "/openapi.json" && method == "GET")
-            {
-                res.ContentType = "application/json";
-                var spec = BuildOpenApiSpec();
-                var json = JsonSerializer.Serialize(spec, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    WriteIndented = true
-                });
-                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-                res.StatusCode = 200;
-                await res.OutputStream.WriteAsync(bytes);
-                res.OutputStream.Close();
-                return;
-            }
-
-            // /docs — Swagger UI
-            if (rawPath == "/docs" && method == "GET")
-            {
-                res.ContentType = "text/html";
-                var html = @"<!DOCTYPE html>
-<html>
-<head>
-  <title>ZeroMCP API</title>
-  <meta charset=""utf-8""/>
-  <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
-  <link rel=""stylesheet"" href=""https://unpkg.com/swagger-ui-dist/swagger-ui.css"">
-</head>
-<body>
-<div id=""swagger-ui""></div>
-<script src=""https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js""></script>
-<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-</body>
-</html>";
-                var bytes = System.Text.Encoding.UTF8.GetBytes(html);
-                res.StatusCode = 200;
-                await res.OutputStream.WriteAsync(bytes);
-                res.OutputStream.Close();
-                return;
-            }
-
-            // Route-based tool dispatch
-            foreach (var (name, tool) in _tools)
-            {
-                if (tool.Route == null) continue;
-                if (!string.Equals(tool.Route.Method, method, StringComparison.OrdinalIgnoreCase)) continue;
-
-                var pathParams = MatchRoutePath(tool.Route.Path, rawPath);
-                if (pathParams == null) continue;
-
-                var args = new Dictionary<string, JsonElement>();
-
-                // Merge path params
-                foreach (var (k, v) in pathParams)
-                    args[k] = JsonDocument.Parse(JsonSerializer.Serialize(v)).RootElement.Clone();
-
-                if (method == "GET")
-                {
-                    // Merge query params
-                    foreach (string? key in req.QueryString.Keys)
-                    {
-                        if (key == null) continue;
-                        var val = req.QueryString[key] ?? "";
-                        args[key] = JsonDocument.Parse(JsonSerializer.Serialize(val)).RootElement.Clone();
-                    }
-                }
-                else
-                {
-                    // Merge JSON body
-                    using var sr = new StreamReader(req.InputStream);
-                    var body = await sr.ReadToEndAsync();
-                    if (!string.IsNullOrWhiteSpace(body))
-                    {
-                        try
-                        {
-                            var bodyDoc = JsonDocument.Parse(body);
-                            if (bodyDoc.RootElement.ValueKind == JsonValueKind.Object)
-                            {
-                                foreach (var prop in bodyDoc.RootElement.EnumerateObject())
-                                    args[prop.Name] = prop.Value.Clone();
-                            }
-                        }
-                        catch { /* ignore malformed body */ }
-                    }
-                }
-
-                try
-                {
-                    var toolCtx = new ToolContext { ToolName = name, Permissions = tool.Permissions };
-                    var result = await tool.Execute!(args, toolCtx);
-                    var json = JsonSerializer.Serialize(new { ok = true, result }, JsonOptions);
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-                    res.StatusCode = 200;
-                    await res.OutputStream.WriteAsync(bytes);
-                }
-                catch (Exception ex)
-                {
-                    var json = JsonSerializer.Serialize(new { ok = false, error = ex.Message }, JsonOptions);
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-                    res.StatusCode = 500;
-                    await res.OutputStream.WriteAsync(bytes);
-                }
-
-                res.OutputStream.Close();
-                return;
-            }
-
-            // No match
-            var notFound = System.Text.Encoding.UTF8.GetBytes("{\"ok\":false,\"error\":\"Not found\"}");
-            res.StatusCode = 404;
-            await res.OutputStream.WriteAsync(notFound);
-            res.OutputStream.Close();
-        }
-        catch (Exception ex)
-        {
-            try
-            {
-                var errBytes = System.Text.Encoding.UTF8.GetBytes(
-                    JsonSerializer.Serialize(new { ok = false, error = ex.Message }));
-                res.StatusCode = 500;
-                await res.OutputStream.WriteAsync(errBytes);
-                res.OutputStream.Close();
-            }
-            catch { /* socket already closed */ }
-        }
-    }
-
-    /// <summary>
-    /// Match a route pattern with :param segments against an incoming path.
-    /// Returns captured parameters or null if no match.
-    /// </summary>
-    private static Dictionary<string, string>? MatchRoutePath(string pattern, string path)
-    {
-        var patternSegments = pattern.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var pathSegments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        if (patternSegments.Length != pathSegments.Length) return null;
-
-        var captured = new Dictionary<string, string>();
-        for (var i = 0; i < patternSegments.Length; i++)
-        {
-            if (patternSegments[i].StartsWith(':'))
-                captured[patternSegments[i][1..]] = pathSegments[i];
-            else if (!string.Equals(patternSegments[i], pathSegments[i], StringComparison.OrdinalIgnoreCase))
-                return null;
-        }
-
-        return captured;
+            JsonValueKind.Object => IsHttp(t),
+            JsonValueKind.Array => t.EnumerateArray().Any(IsHttp),
+            _ => false
+        };
     }
 
     /// <summary>
@@ -548,7 +438,7 @@ public class ZeroMcpServer
         try
         {
             var ctx = ContextFactory?.Invoke(name, tool.Permissions)
-                ?? new ToolContext { ToolName = name, Permissions = tool.Permissions };
+                ?? new ToolContext { ToolName = name, Permissions = tool.Permissions, Runtime = _remoteTools.Contains(name) ? null : GetRuntime?.Invoke() };
             var timeoutMs = tool.Permissions?.ExecuteTimeout ?? _config.ExecuteTimeout ?? 30000;
 
             var executeTask = tool.Execute!(args, ctx);

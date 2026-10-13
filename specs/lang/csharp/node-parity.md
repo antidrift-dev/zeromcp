@@ -2,7 +2,7 @@
 
 ## Status
 
-Not started. Spec only.
+Done (2026-10-13). Docker: `dotnet test` 94 passed, 3 pre-existing TemplateTests failures; C# conformance unchanged (all suites pass).
 
 ## Gaps
 

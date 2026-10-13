@@ -15,6 +15,8 @@ public class ToolContext
     public string ToolName { get; set; } = "";
     public object? Credentials { get; set; }
     public Permissions? Permissions { get; set; }
+    /// <summary>Per-call value from ZeroMcpServer.GetRuntime (null when unset).</summary>
+    public object? Runtime { get; set; }
 }
 
 public class ToolRoute

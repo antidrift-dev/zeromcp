@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — C#
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: `dotnet test` 94 passed, 3 pre-existing TemplateTests failures; C# route conformance 5/5 via the new RouteTest harness; grep for HttpListener/ServeHttp/MatchRoutePath/swagger in csharp/ZeroMcp is empty.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `Registry.Create` (routes, OpenAPI, MCP handler as plain data) and `ZeroMcpServer.HandleRequest` already cover that. `ZeroMcpServer.ServeHttp` is the one piece that runs its own `HttpListener` inside the library.
