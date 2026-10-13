@@ -34,6 +34,8 @@ Ruby passes all 10 conformance suites.
 
 ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handle_request` method that takes a Hash and returns a Hash (or `nil` for notifications).
 
+The built-in `ZeroMcp.serve_http` runs on WEBrick, which is not part of the standard library since Ruby 3.0. Add `gem 'webrick'` to your Gemfile to use it; stdio and `handle_request` don't need it.
+
 ```ruby
 # response = server.handle_request(request)
 ```

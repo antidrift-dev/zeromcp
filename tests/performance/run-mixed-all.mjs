@@ -113,7 +113,7 @@ asyncio.run(main())
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', '/zeromcp/java/target/zeromcp-0.1.1.jar:/zeromcp/java/target/deps/*:/tmp/java-out', 'ResourceTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', '/zeromcp/java/target/zeromcp.jar:/zeromcp/java/target/deps/*:/tmp/java-out', 'ResourceTest'],
     stdio: true,
   },
   {

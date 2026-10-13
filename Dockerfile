@@ -91,7 +91,7 @@ RUN cd swift && rm -rf .build && swift build 2>&1; \
 RUN cd java && mvn package -q -DskipTests && \
     mvn dependency:copy-dependencies -DoutputDirectory=target/deps -q && \
     mkdir -p /tmp/java-out && \
-    javac -cp "target/zeromcp-0.2.2.jar:target/deps/*" \
+    javac -cp "target/zeromcp.jar:target/deps/*" \
       -d /tmp/java-out \
       example/src/main/java/Main.java \
       example/src/main/java/SandboxTest.java \

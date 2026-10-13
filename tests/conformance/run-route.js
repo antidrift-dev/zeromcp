@@ -65,7 +65,7 @@ const implementations = [
     name: 'Java',
     command: 'java',
     args: ['-Dfile.encoding=UTF-8', '-cp',
-      join(root, 'java/target/zeromcp-0.2.2.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out',
+      join(root, 'java/target/zeromcp.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out',
       'RouteTest'],
     env: { JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF-8' },
     port: 14256,

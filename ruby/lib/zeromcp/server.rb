@@ -3,7 +3,6 @@
 require 'json'
 require 'base64'
 require 'timeout'
-require 'webrick'
 require_relative 'schema'
 require_relative 'config'
 require_relative 'tool'
@@ -35,6 +34,7 @@ module ZeroMcp
     #
     # Usage: ZeroMcp::Server.new.serve_http(port: 3000)
     def serve_http(port: 3000)
+      require_webrick
       load_tools
 
       http = WEBrick::HTTPServer.new(Port: port, Logger: WEBrick::Log.new($stderr), AccessLog: [])
@@ -503,6 +503,14 @@ module ZeroMcp
     end
 
     # --- HTTP route helpers ---
+
+    # webrick left the standard library in Ruby 3.0. Load it only for the HTTP
+    # transport so stdio, handle_request and Registry work without it.
+    def require_webrick
+      require 'webrick'
+    rescue LoadError
+      raise LoadError, 'webrick is required for the HTTP transport: gem install webrick (or add it to your Gemfile)'
+    end
 
     def register_tool_route(http, tool, route_method, route_path)
       # Convert :param segments to a regex for matching

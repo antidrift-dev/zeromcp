@@ -427,7 +427,7 @@ const implementations = [
   {
     name: 'Java',
     command: 'java',
-    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp-0.1.0.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'ChaosTest'],
+    args: ['-Dfile.encoding=UTF-8', '-cp', join(root, 'java/target/zeromcp.jar') + ':' + join(root, 'java/target/deps/*') + ':/tmp/java-out', 'ChaosTest'],
     optional: true,
     hasChaosTools: true,
   },
