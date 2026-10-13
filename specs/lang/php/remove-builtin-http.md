@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — PHP
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: php unit tests 256 passed / 0 failed; `zeromcp.php http` exits 1; PHP route conformance 5/5 via tests/conformance/route-harness-php.php (was skipped).
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `ZeroMcp\Registry::create()` (routes, OpenAPI, MCP handler as plain data) and `Server::handleRequest()` already cover that.

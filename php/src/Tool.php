@@ -14,6 +14,11 @@ class Tool
     public array $cachedSchema;
     /** Optional HTTP route: ['method' => 'GET'|'POST'|..., 'path' => '/:param/...'] */
     public ?array $route;
+    /**
+     * Credential namespace: the first directory segment of the tool file, set by
+     * the Scanner. Null for top-level files and for tools built in code.
+     */
+    public ?string $credentialNs = null;
 
     public function __construct(
         string $name,
@@ -59,6 +64,8 @@ class Context
     public mixed $credentials;
     public array $permissions;
     public bool $bypass;
+    /** Value returned by the Server's `get_runtime` option, or null when not set. */
+    public mixed $runtime = null;
 
     public function __construct(string $toolName, mixed $credentials = null, array $permissions = [], bool $bypass = false)
     {

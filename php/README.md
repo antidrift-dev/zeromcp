@@ -34,11 +34,12 @@ PHP passes all 10 conformance suites.
 
 ## HTTP / Streamable HTTP
 
-ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives you a `handleRequest` method that takes an associative array and returns an array (or `null` for notifications).
+ZeroMCP doesn't own the HTTP layer and ships no HTTP server. You bring your own framework; ZeroMCP gives you the pieces as plain data:
 
-```php
-// $response = $server->handleRequest($request);
-```
+- `ZeroMcp\Registry::create($tools)` returns `->routes` (one `RouteDefinition` per tool that declares a `route`), `->openapi` (an OpenAPI 3.0 array) and `->mcp($request)` (the JSON-RPC handler: takes an associative array, returns an array, or `null` for notifications).
+- `Server::handleRequest($request)` is the same JSON-RPC handler for a config-driven server (`new Server($config)` then `->loadTools()`).
+
+A config with `"transport": [{"type": "http"}]` now fails at startup with an error pointing here, and the old `zeromcp.php http` command exits 1.
 
 **Slim**
 
@@ -46,22 +47,94 @@ ZeroMCP doesn't own the HTTP layer. You bring your own framework; ZeroMCP gives 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
+use ZeroMcp\Config;
+use ZeroMcp\Registry;
+use ZeroMcp\Scanner;
+
+// Tools from a directory (or build ZeroMcp\Tool objects / definition arrays in code).
+$tools = (new Scanner(new Config(['tools' => __DIR__ . '/tools'])))->scan();
+$registry = Registry::create($tools);
 
 $app = AppFactory::create();
 
-$app->post('/mcp', function (Request $req, Response $res) use ($server) {
-    $body = json_decode((string) $req->getBody(), true);
-    $response = $server->handleRequest($body);
+$json = function (Response $res, mixed $data, int $status = 200): Response {
+    $res->getBody()->write(json_encode($data, JSON_UNESCAPED_SLASHES));
+    return $res->withHeader('Content-Type', 'application/json')->withStatus($status);
+};
 
-    if ($response === null) {
-        return $res->withStatus(204);
-    }
-    $res->getBody()->write(json_encode($response));
-    return $res->withHeader('Content-Type', 'application/json');
+// MCP over HTTP
+$app->post('/mcp', function (Request $req, Response $res) use ($registry, $json) {
+    $response = $registry->mcp(json_decode((string) $req->getBody(), true) ?? []);
+    return $response === null ? $res->withStatus(204) : $json($res, $response);
 });
+
+// OpenAPI document
+$app->get('/openapi.json', fn(Request $req, Response $res) => $json($res, $registry->openapi));
+
+// One REST route per tool that declares `route` (Slim uses {param}, tools use :param)
+foreach ($registry->routes as $route) {
+    $path = preg_replace('/:([a-zA-Z_]\w*)/', '{$1}', $route->path);
+    $app->map([$route->method], $path, function (Request $req, Response $res, array $params) use ($route, $json) {
+        $args = $route->method === 'GET'
+            ? array_merge($req->getQueryParams(), $params)
+            : array_merge(json_decode((string) $req->getBody(), true) ?? [], $params);
+        try {
+            return $json($res, ['ok' => true, 'result' => $route->tool->call($args)]);
+        } catch (\Throwable $e) {
+            return $json($res, ['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    });
+}
 
 $app->run();
 ```
+
+`Registry::create()` options:
+
+- `get_env` — callable whose return value becomes `$ctx->credentials` on every call.
+- `config` — a `Config` for title, timeouts, page size and so on (default: in-memory defaults, nothing read from disk).
+- `remote` — remote MCP servers to federate (see below). Their tools are reachable through `->mcp()` but never appear in `->routes` or `->openapi`. The HTTP calls block, so `create()` stays synchronous.
+
+## Remote servers
+
+Pull another MCP server's tools in over HTTP. Each remote tool is exposed as `<name>.<tool>`:
+
+```json
+{
+  "tools": "./tools",
+  "remote": [
+    { "name": "probeo", "url": "https://mcp.example.com/mcp", "auth": "env:PROBEO_TOKEN", "tools": ["list_pages"] }
+  ]
+}
+```
+
+- `auth` is sent as `Authorization: Bearer <value>`; `env:VAR` reads it from the environment.
+- `tools` is an optional allowlist of upstream tool names; omit it to expose everything.
+- A server that can't be reached, isn't `http(s)://`, or returns a non-2xx status is logged and skipped.
+- A local tool with the same name overrides the remote one.
+
+`remote` works for `zeromcp.php serve`, for `new Server($config)` + `loadTools()`, and for `Registry::create($tools, ['remote' => [...]])`.
+
+## Runtime context
+
+Pass a `get_runtime` callable to the `Server` and its return value lands on `$ctx->runtime` for every tool call (it is called once per call; when it returns `null`, `$ctx->runtime` stays `null`):
+
+```php
+$server = new ZeroMcp\Server($config, ['get_runtime' => fn() => ['db' => $pdo, 'user' => $currentUser]]);
+$server->loadTools();
+$response = $server->handleRequest($request);
+```
+
+```php
+// tools/whoami.php
+return [
+    'execute' => fn($args, $ctx) => $ctx->runtime['user'],
+];
+```
+
+## Hot reload
+
+With `"autoload_tools": true`, `zeromcp.php serve` polls the tool directories about once a second. When a tool file is added, changed or removed it logs `[zeromcp] Change detected: <file>`, rescans, and sends `notifications/tools/list_changed`. Tools whose files were deleted stay registered until restart (same as the Node implementation).
 
 ## Requirements
 
@@ -95,6 +168,17 @@ tools/
   math/
     add.php          -> tool "math_add"
 ```
+
+Rename or drop a directory prefix with `namespacing`, and prefix a whole tool source with `{path, prefix}`:
+
+```json
+{
+  "tools": ["./tools", { "path": "./vendor-tools", "prefix": "vendor" }],
+  "namespacing": { "math": { "prefix": "m" } }
+}
+```
+
+Here `tools/math/add.php` becomes `m_add` (an empty `prefix` gives plain `add`) and `vendor-tools/search.php` becomes `vendor_search`. Both joins use `separator`. Credentials stay keyed by the directory name (`"credentials": {"math": {...}}`), whatever the tool ends up being called.
 
 ## Testing
 

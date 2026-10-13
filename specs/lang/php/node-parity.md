@@ -1,7 +1,7 @@
 # Node parity — PHP
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: php unit tests 256 passed / 0 failed (new RemoteTest + Config/Scanner/Server/Registry cases); PHP conformance unchanged (all stdio suites pass).
 
 ## Gaps
 1. Remote federation (`remote` config) in `Server` (covers serve, serveHttp, and the handler entry point)

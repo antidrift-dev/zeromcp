@@ -25,6 +25,11 @@ class ScannerTest
         $this->testScanPrompts();
         $this->testScanPromptsArguments();
         $this->testScanEmptyDir();
+        $this->testSourcePrefix();
+        $this->testNamespacingPrefix();
+        $this->testNamespacingEmptyPrefix();
+        $this->testCustomSeparatorBothJoins();
+        $this->testCredentialNs();
 
         echo "\n{$this->passed} passed, {$this->failed} failed\n";
         if ($this->failed > 0) exit(1);
@@ -164,6 +169,72 @@ class ScannerTest
         $this->assert(empty($prompts), 'empty dir returns no prompts');
 
         @rmdir($tmpDir);
+    }
+
+    /** Temp tools dir with math/add.php and top.php. */
+    private function makeToolsDir(): string
+    {
+        $dir = sys_get_temp_dir() . '/zeromcp-scan-' . getmypid() . '-' . bin2hex(random_bytes(3));
+        mkdir("$dir/math", 0777, true);
+        file_put_contents("$dir/math/add.php", "<?php return ['description' => 'add', 'execute' => fn(\$a, \$c) => 'sum'];");
+        file_put_contents("$dir/top.php", "<?php return ['description' => 'top', 'execute' => fn(\$a, \$c) => 'top'];");
+        return $dir;
+    }
+
+    private function removeDir(string $dir): void
+    {
+        @unlink("$dir/math/add.php");
+        @unlink("$dir/top.php");
+        @rmdir("$dir/math");
+        @rmdir($dir);
+    }
+
+    private function scanNames(array $opts): array
+    {
+        $names = array_keys((new Scanner(new Config($opts)))->scan());
+        sort($names);
+        return $names;
+    }
+
+    private function testSourcePrefix(): void
+    {
+        $dir = $this->makeToolsDir();
+        $names = $this->scanNames(['tools' => [['path' => $dir, 'prefix' => 'x']]]);
+        $this->assert($names === ['x_math_add', 'x_top'], 'source prefix gives x_math_add');
+        $this->removeDir($dir);
+    }
+
+    private function testNamespacingPrefix(): void
+    {
+        $dir = $this->makeToolsDir();
+        $names = $this->scanNames(['tools' => $dir, 'namespacing' => ['math' => ['prefix' => 'm']]]);
+        $this->assert($names === ['m_add', 'top'], 'namespacing prefix m gives m_add');
+        $this->removeDir($dir);
+    }
+
+    private function testNamespacingEmptyPrefix(): void
+    {
+        $dir = $this->makeToolsDir();
+        $names = $this->scanNames(['tools' => $dir, 'namespacing' => ['math' => ['prefix' => '']]]);
+        $this->assert($names === ['add', 'top'], "namespacing prefix '' drops the dir prefix");
+        $this->removeDir($dir);
+    }
+
+    private function testCustomSeparatorBothJoins(): void
+    {
+        $dir = $this->makeToolsDir();
+        $names = $this->scanNames(['tools' => [['path' => $dir, 'prefix' => 'x']], 'separator' => '.']);
+        $this->assert($names === ['x.math.add', 'x.top'], 'custom separator applied to both joins');
+        $this->removeDir($dir);
+    }
+
+    private function testCredentialNs(): void
+    {
+        $dir = $this->makeToolsDir();
+        $tools = (new Scanner(new Config(['tools' => $dir, 'namespacing' => ['math' => ['prefix' => 'm']]])))->scan();
+        $this->assert($tools['m_add']->credentialNs === 'math', 'credentialNs is the first directory segment');
+        $this->assert($tools['top']->credentialNs === null, 'credentialNs is null for top-level files');
+        $this->removeDir($dir);
     }
 }
 

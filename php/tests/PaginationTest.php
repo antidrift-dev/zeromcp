@@ -13,6 +13,7 @@ require_once __DIR__ . '/../src/Resource.php';
 require_once __DIR__ . '/../src/Prompt.php';
 require_once __DIR__ . '/../src/Scanner.php';
 require_once __DIR__ . '/../src/Sandbox.php';
+require_once __DIR__ . '/../src/RemoteManager.php';
 require_once __DIR__ . '/../src/Server.php';
 
 use ZeroMcp\Server;

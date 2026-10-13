@@ -44,15 +44,15 @@ class Scanner
     public function scan(): array
     {
         $this->tools = [];
-        $dirs = $this->config->toolsDirs;
 
-        foreach ($dirs as $d) {
+        foreach ($this->config->toolSources as $source) {
+            $d = $source['path'];
             $dir = realpath($d) ?: $d;
             if (!is_dir($dir)) {
                 Log::write("[zeromcp] Cannot read tools directory: $dir\n");
                 continue;
             }
-            $this->scanDir($dir, $dir);
+            $this->scanDir($dir, $dir, $source['prefix'] ?? null);
         }
 
         return $this->tools;
@@ -109,7 +109,7 @@ class Scanner
         return $this->tools;
     }
 
-    private function scanDir(string $dir, string $rootDir): void
+    private function scanDir(string $dir, string $rootDir, ?string $sourcePrefix = null): void
     {
         $entries = scandir($dir);
         foreach ($entries as $entry) {
@@ -118,19 +118,19 @@ class Scanner
             $fullPath = $dir . '/' . $entry;
 
             if (is_dir($fullPath)) {
-                $this->scanDir($fullPath, $rootDir);
+                $this->scanDir($fullPath, $rootDir, $sourcePrefix);
                 continue;
             }
 
             if (pathinfo($entry, PATHINFO_EXTENSION) !== 'php') continue;
 
-            $this->loadTool($fullPath, $rootDir);
+            $this->loadTool($fullPath, $rootDir, $sourcePrefix);
         }
     }
 
-    private function loadTool(string $filePath, string $rootDir): void
+    private function loadTool(string $filePath, string $rootDir, ?string $sourcePrefix = null): void
     {
-        $name = $this->buildName($filePath, $rootDir);
+        $name = $this->buildName($filePath, $rootDir, $sourcePrefix);
 
         try {
             $toolDef = require $filePath;
@@ -141,7 +141,11 @@ class Scanner
 
             $this->logPermissions($name, $toolDef['permissions'] ?? []);
 
-            $this->tools[$name] = Tool::fromDefinition($name, $toolDef);
+            $tool = Tool::fromDefinition($name, $toolDef);
+            // Credentials stay keyed by the first directory segment, whatever the
+            // namespacing/prefix rules made of the tool name.
+            $tool->credentialNs = $this->firstDirSegment($filePath, $rootDir);
+            $this->tools[$name] = $tool;
 
             Log::write("[zeromcp] Loaded: $name\n");
         } catch (\Throwable $e) {
@@ -150,19 +154,37 @@ class Scanner
         }
     }
 
-    private function buildName(string $filePath, string $rootDir): string
+    private function buildName(string $filePath, string $rootDir, ?string $sourcePrefix = null): string
     {
+        $sep = $this->config->separator;
         $rel = $this->relativePath($filePath, $rootDir);
         $parts = explode('/', $rel);
         $file = array_pop($parts);
         $filename = pathinfo($file, PATHINFO_FILENAME);
 
+        // Inner name: directory-based, with an optional namespacing override.
+        $innerName = $filename;
         if (count($parts) > 0) {
-            $dirPrefix = $parts[0];
-            return $dirPrefix . $this->config->separator . $filename;
+            $dir = $parts[0];
+            $override = $this->config->namespacing[$dir] ?? [];
+            $dirPrefix = is_array($override) && array_key_exists('prefix', $override) ? $override['prefix'] : $dir;
+            if ($dirPrefix !== null && $dirPrefix !== '') {
+                $innerName = $dirPrefix . $sep . $filename;
+            }
         }
 
-        return $filename;
+        // Source-level prefix.
+        if ($sourcePrefix !== null && $sourcePrefix !== '') {
+            return $sourcePrefix . $sep . $innerName;
+        }
+
+        return $innerName;
+    }
+
+    private function firstDirSegment(string $filePath, string $rootDir): ?string
+    {
+        $parts = explode('/', $this->relativePath($filePath, $rootDir));
+        return count($parts) >= 2 ? $parts[0] : null;
     }
 
     private function relativePath(string $path, string $base): string
