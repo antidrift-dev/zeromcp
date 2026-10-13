@@ -2,6 +2,10 @@ package io.antidrift.zeromcp;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
+import static io.antidrift.zeromcp.FakeUpstream.*;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class RegistryTest {
@@ -122,5 +126,49 @@ class RegistryTest {
 
         var registry = server.registry();
         assertEquals(0, registry.routes().size());
+    }
+
+    @Test
+    void remoteToolsAreInMcpButNotRoutesOrOpenapi() throws Exception {
+        try (var up = new FakeUpstream()) {
+            var server = new ZeroMcp(testConfig()).remote(new RemoteServer("probeo", up.url()));
+            server.tool("greet", routedTool("GET", "/greet/:name"));
+
+            var registry = server.registry();
+            var names = toolNames(registry.mcp().handle(request("tools/list", null)));
+            assertEquals(List.of("probeo.list_pages", "probeo.get_page", "greet"), names);
+
+            var res = registry.mcp().handle(request("tools/call", callParams("probeo.list_pages", null)));
+            assertEquals("upstream:list_pages:{}", text(res));
+
+            assertEquals(1, registry.routes().size());
+            assertEquals("greet", registry.routes().get(0).name());
+            var paths = registry.openapi().getAsJsonObject("paths");
+            assertEquals(1, paths.size());
+            assertTrue(paths.has("/greet/{name}"));
+        }
+    }
+
+    @Test
+    void localToolOverridesRemoteInRegistry() throws Exception {
+        try (var up = new FakeUpstream()) {
+            var server = new ZeroMcp(testConfig()).remote(new RemoteServer("probeo", up.url()));
+            server.tool("probeo.get_page", Tool.builder().execute((a, ctx) -> "local").build());
+
+            var registry = server.registry();
+            var res = registry.mcp().handle(request("tools/call", callParams("probeo.get_page", null)));
+            assertEquals("local", text(res));
+            assertTrue(up.calledNames.isEmpty());
+        }
+    }
+
+    @Test
+    void runtimeReachesToolsThroughRegistryMcp() {
+        var server = new ZeroMcp(testConfig()).runtime(() -> "prod");
+        server.tool("env", Tool.builder().execute((a, ctx) -> ctx.runtime()).build());
+
+        var registry = server.registry();
+        var res = registry.mcp().handle(request("tools/call", callParams("env", null)));
+        assertEquals("prod", text(res));
     }
 }

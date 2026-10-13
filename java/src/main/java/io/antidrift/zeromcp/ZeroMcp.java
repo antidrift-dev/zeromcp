@@ -1,17 +1,13 @@
 package io.antidrift.zeromcp;
 
 import com.google.gson.*;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 
 /**
  * ZeroMcp -- zero-config MCP runtime for Java.
@@ -49,6 +45,10 @@ public class ZeroMcp {
     private int pageSize = 0;
     private String logLevel = "info";
     private String icon = null;
+    private boolean iconSet = false;
+    private final List<RemoteServer> remotes = new ArrayList<>();
+    private Supplier<?> runtimeSupplier = null;
+    private volatile boolean started = false;
 
     public ZeroMcp() {
         this(Config.load());
@@ -56,6 +56,8 @@ public class ZeroMcp {
 
     public ZeroMcp(Config config) {
         this.config = config;
+        this.pageSize = config.pageSize();
+        this.remotes.addAll(config.remote());
     }
 
     // ---- Builder-style setters ----
@@ -73,6 +75,27 @@ public class ZeroMcp {
      */
     public ZeroMcp icon(String icon) {
         this.icon = icon;
+        this.iconSet = true;
+        return this;
+    }
+
+    /**
+     * Federate tools from remote MCP servers, namespaced as {@code <name>.<tool>}.
+     * Appends to the servers listed under {@code remote} in zeromcp.config.json.
+     * Remotes connect once, on the first {@link #serve}, {@link #handleRequest}
+     * or {@link #registry} call. A local tool with the same name overrides the remote one.
+     */
+    public ZeroMcp remote(RemoteServer... servers) {
+        Collections.addAll(remotes, servers);
+        return this;
+    }
+
+    /**
+     * Set a supplier whose value is passed to every local tool execution as
+     * {@link Ctx#runtime()}. Called once per tool call. Remote tools do not get it.
+     */
+    public ZeroMcp runtime(Supplier<?> getRuntime) {
+        this.runtimeSupplier = getRuntime;
         return this;
     }
 
@@ -84,18 +107,54 @@ public class ZeroMcp {
     public void tool(String name, Tool tool) {
         Sandbox.validatePermissions(name, tool.permissions());
         var schema = Schema.toJsonSchema(tool.inputs());
-        tools.put(name, new NamedTool(name, tool, schema));
+        tools.put(name, new NamedTool(name, tool, schema, false));
     }
 
     /**
      * Build a framework-neutral registry snapshot of the currently-registered,
-     * route-annotated tools plus a JSON-RPC dispatcher, for embedding into a
-     * caller-owned HTTP framework instead of ZeroMcp's built-in server.
-     * Call this after all {@link #tool} registrations are done, same as
-     * {@link #serve} / {@link #serveHttp}.
+     * route-annotated tools plus a JSON-RPC dispatcher, for mounting in your
+     * own HTTP server. Call this after all {@link #tool} registrations are done,
+     * same as {@link #serve}. Connects remote servers first (blocking); remote
+     * tools are served by {@code mcp()} but have no routes or OpenAPI entries.
      */
     public Registry registry() {
+        connectRemotesOnce();
         return new Registry(routeDefinitions(), buildOpenApiSpec(), this::handleRequest);
+    }
+
+    /**
+     * One-time startup: connect remote servers, merge their tools ahead of local
+     * ones (local overrides remote), and resolve the config icon.
+     */
+    private void connectRemotesOnce() {
+        if (started) return;
+        synchronized (this) {
+            if (started) return;
+
+            if (!remotes.isEmpty()) {
+                var remoteTools = new RemoteManager().connect(remotes);
+                var merged = new LinkedHashMap<String, NamedTool>();
+                for (var entry : remoteTools.entrySet()) {
+                    var tool = entry.getValue();
+                    merged.put(entry.getKey(),
+                        new NamedTool(entry.getKey(), tool, Schema.toJsonSchema(tool.inputs()), true));
+                }
+                for (var entry : tools.entrySet()) {
+                    if (merged.containsKey(entry.getKey())) {
+                        System.err.println("[zeromcp] Local tool \"" + entry.getKey() + "\" overrides remote");
+                    }
+                    merged.put(entry.getKey(), entry.getValue());
+                }
+                tools.clear();
+                tools.putAll(merged);
+            }
+
+            if (!iconSet && config.icon() != null) {
+                icon = Config.resolveIcon(config.icon());
+            }
+
+            started = true;
+        }
     }
 
     private List<RouteDefinition> routeDefinitions() {
@@ -120,186 +179,6 @@ public class ZeroMcp {
      */
     public void prompt(String name, PromptDef prompt) {
         prompts.put(name, new NamedPrompt(name, prompt));
-    }
-
-    /**
-     * Start an HTTP server that exposes route-annotated tools as REST endpoints.
-     * The /mcp endpoint handles standard JSON-RPC (POST body). Route-annotated tools
-     * are also mounted at their configured paths. Blocks until the current thread is
-     * interrupted.
-     *
-     * @param port TCP port to listen on (0 = use config port)
-     */
-    public void serveHttp(int port) throws IOException {
-        int listenPort = port > 0 ? port : config.port();
-        var server = HttpServer.create(new InetSocketAddress(listenPort), 0);
-
-        // /mcp — standard JSON-RPC over HTTP POST
-        server.createContext("/mcp", exchange -> {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
-            try {
-                var body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                var request = JsonParser.parseString(body).getAsJsonObject();
-                var response = handleRequest(request);
-                var responseJson = response != null ? gson.toJson(response) : "{}";
-                sendHttpResponse(exchange, 200, responseJson);
-            } catch (Exception e) {
-                sendHttpResponse(exchange, 400, "{\"error\":\"Bad Request\"}");
-            }
-        });
-
-        // /openapi.json — auto-generated OpenAPI 3.0 spec from route-annotated tools
-        server.createContext("/openapi.json", exchange -> {
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
-            var spec = buildOpenApiSpec();
-            var bytes = gson.toJson(spec).getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (var os = exchange.getResponseBody()) { os.write(bytes); }
-        });
-
-        // /docs — Swagger UI HTML pointing at /openapi.json
-        server.createContext("/docs", exchange -> {
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendHttpResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
-            var html = "<!DOCTYPE html>\n<html>\n<head>\n" +
-                "  <title>ZeroMCP API</title>\n" +
-                "  <meta charset=\"utf-8\"/>\n" +
-                "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
-                "  <link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist/swagger-ui.css\">\n" +
-                "</head>\n<body>\n" +
-                "<div id=\"swagger-ui\"></div>\n" +
-                "<script src=\"https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js\"></script>\n" +
-                "<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>\n" +
-                "</body>\n</html>";
-            var bytes = html.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (var os = exchange.getResponseBody()) { os.write(bytes); }
-        });
-
-        // Register a context for each route-annotated tool
-        for (var entry : tools.entrySet()) {
-            var toolName = entry.getKey();
-            var namedTool = entry.getValue();
-            var route = namedTool.tool().route();
-            if (route == null) continue;
-
-            server.createContext(route.path(), exchange -> {
-                var reqMethod = exchange.getRequestMethod().toUpperCase();
-                if (!reqMethod.equals(route.method())) {
-                    sendHttpResponse(exchange, 405, "{\"ok\":false,\"error\":\"Method Not Allowed\"}");
-                    return;
-                }
-                try {
-                    var args = new LinkedHashMap<String, Object>();
-
-                    // Extract path params by matching URI against route pattern
-                    var pathParams = matchPathParams(route.path(), exchange.getRequestURI().getPath());
-                    args.putAll(pathParams);
-
-                    if ("GET".equals(reqMethod)) {
-                        // Merge query params
-                        var query = exchange.getRequestURI().getRawQuery();
-                        if (query != null) args.putAll(parseQueryString(query));
-                    } else {
-                        // Merge JSON body
-                        var body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                        if (!body.isBlank()) {
-                            try {
-                                var bodyJson = JsonParser.parseString(body).getAsJsonObject();
-                                args.putAll(jsonObjectToMap(bodyJson));
-                            } catch (Exception ignored) {}
-                        }
-                    }
-
-                    var ctx = new Ctx(toolName, namedTool.tool().permissions());
-                    var result = namedTool.tool().executor().execute(args, ctx);
-                    var resultStr = result instanceof String s ? s : gson.toJson(result);
-
-                    var resp = new JsonObject();
-                    resp.addProperty("ok", true);
-                    resp.addProperty("result", resultStr);
-                    sendHttpResponse(exchange, 200, gson.toJson(resp));
-                } catch (Exception e) {
-                    var resp = new JsonObject();
-                    resp.addProperty("ok", false);
-                    resp.addProperty("error", e.getMessage() != null ? e.getMessage() : "Internal error");
-                    sendHttpResponse(exchange, 500, gson.toJson(resp));
-                }
-            });
-        }
-
-        server.setExecutor(Executors.newCachedThreadPool());
-        server.start();
-        System.err.println("[zeromcp] HTTP server listening on port " + listenPort);
-
-        // Block until interrupted
-        try {
-            Thread.currentThread().join();
-        } catch (InterruptedException e) {
-            server.stop(0);
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
-     * Start HTTP server on the config port.
-     */
-    public void serveHttp() throws IOException {
-        serveHttp(0);
-    }
-
-    private static void sendHttpResponse(HttpExchange exchange, int status, String body) throws IOException {
-        var bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(status, bytes.length);
-        try (var os = exchange.getResponseBody()) {
-            os.write(bytes);
-        }
-    }
-
-    /**
-     * Match a URL path against a route pattern with :param segments.
-     * Returns a map of captured param names to values.
-     */
-    private static Map<String, Object> matchPathParams(String pattern, String path) {
-        var patternParts = pattern.split("/", -1);
-        var pathParts = path.split("/", -1);
-        var params = new LinkedHashMap<String, Object>();
-        if (patternParts.length != pathParts.length) return params;
-        for (int i = 0; i < patternParts.length; i++) {
-            if (patternParts[i].startsWith(":")) {
-                params.put(patternParts[i].substring(1), URLDecoder.decode(pathParts[i], StandardCharsets.UTF_8));
-            }
-        }
-        return params;
-    }
-
-    /**
-     * Parse a URL query string into a map of string values.
-     */
-    private static Map<String, Object> parseQueryString(String query) {
-        var map = new LinkedHashMap<String, Object>();
-        for (var pair : query.split("&")) {
-            var idx = pair.indexOf('=');
-            if (idx < 0) {
-                map.put(URLDecoder.decode(pair, StandardCharsets.UTF_8), "");
-            } else {
-                var key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8);
-                var val = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
-                map.put(key, val);
-            }
-        }
-        return map;
     }
 
     /**
@@ -412,6 +291,14 @@ public class ZeroMcp {
      * Start the stdio JSON-RPC server. Blocks until stdin closes.
      */
     public void serve() {
+        var transport = config.transport();
+        if (transport != null && !"stdio".equals(transport)) {
+            throw new IllegalStateException("[zeromcp] transport \"" + transport + "\" is not supported: "
+                + "ZeroMCP no longer ships an HTTP server. Mount ZeroMcp.registry() "
+                + "(or handleRequest(JsonObject)) in your own HTTP server.");
+        }
+        connectRemotesOnce();
+
         System.err.println("[zeromcp] " + tools.size() + " tool(s), "
                 + resources.size() + " resource(s), "
                 + prompts.size() + " prompt(s) registered");
@@ -443,6 +330,7 @@ public class ZeroMcp {
      * Returns null for notifications that require no response.
      */
     public JsonObject handleRequest(JsonObject request) {
+        connectRemotesOnce();
         var id = request.get("id");
         var method = request.has("method") ? request.get("method").getAsString() : "";
         var params = request.has("params") ? request.getAsJsonObject("params") : null;
@@ -580,7 +468,8 @@ public class ZeroMcp {
         }
 
         try {
-            var ctx = new Ctx(name, tool.permissions());
+            var runtime = !namedTool.remote() && runtimeSupplier != null ? runtimeSupplier.get() : null;
+            var ctx = new Ctx(name, tool.permissions(), runtime);
 
             long timeoutMs = tool.permissions().executeTimeout() > 0
                 ? tool.permissions().executeTimeout()
@@ -874,7 +763,7 @@ public class ZeroMcp {
 
     // ---- Inner records ----
 
-    private record NamedTool(String name, Tool tool, JsonObject inputSchema) {}
+    private record NamedTool(String name, Tool tool, JsonObject inputSchema, boolean remote) {}
     private record NamedResource(String name, ResourceDef resource) {}
     private record NamedPrompt(String name, PromptDef prompt) {}
 }

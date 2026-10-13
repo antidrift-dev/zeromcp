@@ -1,7 +1,7 @@
 # Node parity — Java
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: `mvn test` 108/108 (new RemoteTest 10, plus runtime/page_size/icon/remote cases in ConfigTest, ZeroMcpTest, RegistryTest); conformance Java suites unchanged (30/30, 13/13, 8/8, 4/4, 4/4, 3/3, 3/3, 3/3).
 
 ## Gaps
 1. Remote federation (`remote` config, incl. per-server `tools` allowlist) in `serve()` / `serveHttp()` / `handleRequest()`

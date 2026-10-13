@@ -746,4 +746,85 @@ class ZeroMcpTest {
         assertEquals(99, resp.get("id").getAsInt());
         assertTrue(resp.has("error"));
     }
+
+    // ===================================================================
+    // Runtime context
+    // ===================================================================
+
+    private static JsonObject callParams(String name) {
+        var params = new JsonObject();
+        params.addProperty("name", name);
+        params.add("arguments", new JsonObject());
+        return params;
+    }
+
+    private static String callText(ZeroMcp server, String name) {
+        var resp = server.handleRequest(makeRequest("tools/call", 1, callParams(name)));
+        return resp.getAsJsonObject("result").getAsJsonArray("content")
+            .get(0).getAsJsonObject().get("text").getAsString();
+    }
+
+    @Test
+    void runtimeSupplierValueReachesCtx() {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var server = new ZeroMcp(testConfig()).runtime(() -> {
+            calls.incrementAndGet();
+            return "prod";
+        });
+        server.tool("env", Tool.builder()
+            .execute((a, ctx) -> ctx.runtime(String.class))
+            .build());
+
+        assertEquals("prod", callText(server, "env"));
+        assertEquals(1, calls.get());
+        assertEquals("prod", callText(server, "env"));
+        assertEquals(2, calls.get());
+    }
+
+    @Test
+    void runtimeIsNullWithoutSupplier() {
+        var server = new ZeroMcp(testConfig());
+        server.tool("env", Tool.builder()
+            .execute((a, ctx) -> ctx.runtime() == null ? "none" : "some")
+            .build());
+        assertEquals("none", callText(server, "env"));
+    }
+
+    // ===================================================================
+    // Config page_size / icon
+    // ===================================================================
+
+    @Test
+    void configPageSizePaginatesToolsList(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("zeromcp.config.json"), "{\"page_size\":1}");
+        var server = new ZeroMcp(Config.load(dir.toString()));
+        server.tool("a", Tool.builder().execute((x, ctx) -> "a").build());
+        server.tool("b", Tool.builder().execute((x, ctx) -> "b").build());
+
+        var result = server.handleRequest(makeRequest("tools/list", 1)).getAsJsonObject("result");
+        assertEquals(1, result.getAsJsonArray("tools").size());
+        assertTrue(result.has("nextCursor"));
+    }
+
+    @Test
+    void configIconIsResolvedAndExplicitSetterWins(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        var svg = dir.resolve("logo.svg");
+        java.nio.file.Files.writeString(svg, "<svg/>");
+        java.nio.file.Files.writeString(dir.resolve("zeromcp.config.json"),
+            "{\"icon\":\"" + svg.toString().replace("\\", "\\\\") + "\"}");
+
+        var server = new ZeroMcp(Config.load(dir.toString()));
+        server.tool("a", Tool.builder().execute((x, ctx) -> "a").build());
+        var tool = server.handleRequest(makeRequest("tools/list", 1)).getAsJsonObject("result")
+            .getAsJsonArray("tools").get(0).getAsJsonObject();
+        assertTrue(tool.getAsJsonArray("icons").get(0).getAsJsonObject().get("uri").getAsString()
+            .startsWith("data:image/svg+xml;base64,"));
+
+        var explicit = new ZeroMcp(Config.load(dir.toString())).icon("https://example.com/i.png");
+        explicit.tool("a", Tool.builder().execute((x, ctx) -> "a").build());
+        var tool2 = explicit.handleRequest(makeRequest("tools/list", 1)).getAsJsonObject("result")
+            .getAsJsonArray("tools").get(0).getAsJsonObject();
+        assertEquals("https://example.com/i.png",
+            tool2.getAsJsonArray("icons").get(0).getAsJsonObject().get("uri").getAsString());
+    }
 }

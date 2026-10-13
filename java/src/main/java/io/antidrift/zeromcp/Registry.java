@@ -5,7 +5,6 @@ import java.util.List;
 
 /**
  * Framework-neutral handle onto a ZeroMcp instance's route-annotated tools
- * and JSON-RPC dispatch, for embedding into a caller-owned HTTP framework
- * instead of using {@link ZeroMcp#serveHttp}.
+ * and JSON-RPC dispatch, for mounting in your own HTTP server.
  */
 public record Registry(List<RouteDefinition> routes, JsonObject openapi, McpHandler mcp) {}
