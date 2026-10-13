@@ -30,7 +30,7 @@ The official SDK also has **no sandbox**. ZeroMCP enforces per-tool network allo
 
 ## HTTP / Streamable HTTP
 
-ZeroMCP exposes a `createHandler` function that works with any HTTP framework. You handle the transport, ZeroMCP handles the MCP protocol.
+ZeroMCP does not ship an HTTP server. The CLI speaks stdio only; for HTTP you mount ZeroMCP in the server you already run. `createHandler` works with any HTTP framework: you handle the transport, ZeroMCP handles the MCP protocol.
 
 ```js
 import { createHandler } from 'zeromcp/handler';
@@ -83,7 +83,34 @@ export default {
 export const handle = async (event) => handler(JSON.parse(event.body));
 ```
 
-The handler takes a JSON-RPC object and returns a JSON-RPC response. No opinions about HTTP framework, headers, or routing.
+The handler takes a JSON-RPC object and returns a JSON-RPC response. No opinions about HTTP framework, headers, auth, CORS, or routing; those belong to your server.
+
+For REST routes and an OpenAPI document alongside `/mcp`, use `createRegistry` (see [REST routes and OpenAPI](#rest-routes-and-openapi)).
+
+### Runtime context
+
+Pass `getRuntime` to hand per-request data (the current user, a database pool, a Worker `env`) to tools. It is called on every tool call and the result arrives as `ctx.runtime`:
+
+```js
+const handler = await createHandler('./tools', { getRuntime: () => ({ db }) });
+
+// tools/whoami.js
+export default {
+  description: 'Who is calling',
+  input: {},
+  execute: async (_args, ctx) => ctx.runtime.db.currentUser(),
+};
+```
+
+### Migrating from `zeromcp serve http`
+
+Versions up to 0.3.0 had a built-in HTTP listener (`zeromcp serve http`, or `{ "type": "http", "port": 4242 }` in the config). It has been removed. Starting with an `http` transport now fails at startup:
+
+```
+[zeromcp] The built-in HTTP transport was removed. Mount createHandler ('@antidrift/zeromcp/handler') or createRegistry ('@antidrift/zeromcp/registry') in your own HTTP server.
+```
+
+Mount `createHandler` (MCP over `/mcp`) or `createRegistry` (MCP plus REST routes and OpenAPI) in your own server instead. Bearer auth, CORS and `/health` are now your server's job.
 
 ## Requirements
 
@@ -169,7 +196,57 @@ import { toJsonSchema, validate } from 'zeromcp/schema'; // Schema utils
 import { createRegistry } from 'zeromcp/registry';  // Framework-neutral tool registry (MCP + REST + OpenAPI)
 ```
 
-`createRegistry` is async and takes a plain object of tools you provide (rather than scanning a directory) — `const registry = await createRegistry(tools, options)` — returning `{ routes, openapi, mcp }`: a route table for wiring into any router, a ready-to-serve OpenAPI document, and an `mcp` handler with the same signature as `createHandler`. Like `createHandler`, it accepts an `options.remote` list of remote MCP servers to federate; their tools are merged in namespaced as `servername.toolname`, with any local tool of the same name overriding the remote one.
+### REST routes and OpenAPI
+
+`createRegistry` is async and takes a plain object of tools you provide (rather than scanning a directory) — `const registry = await createRegistry(tools, options)` — returning `{ routes, openapi, mcp }`: a route table for wiring into any router, a ready-to-serve OpenAPI document, and an `mcp` handler with the same signature as `createHandler`. It does no route matching itself; your router does.
+
+A tool with a `route` gets a REST endpoint. Its `execute` receives `(args, env)`, where `env` comes from `options.getEnv()`, called on every call:
+
+```js
+import express from 'express';
+import { createRegistry } from '@antidrift/zeromcp/registry';
+
+const tools = {
+  greet: {
+    description: 'Greet someone by name',
+    input: { name: 'string' },
+    route: { method: 'GET', path: '/greet/:name' },
+    execute: async ({ name }, env) => `Hello, ${name}! (${env.region})`,
+  },
+};
+
+const getEnv = () => ({ region: process.env.REGION });
+const registry = await createRegistry(tools, { title: 'My API', version: '1.0.0', getEnv });
+
+const app = express();
+app.use(express.json());
+
+for (const route of registry.routes) {
+  const method = route.method.toLowerCase(); // Express uses the same :param syntax
+  app[method](route.path, async (req, res) => {
+    const args = { ...req.query, ...req.body, ...req.params };
+    try {
+      res.json({ ok: true, result: await route.tool.execute(args, getEnv()) });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+}
+
+app.get('/openapi.json', (req, res) => res.json(registry.openapi));
+app.post('/mcp', async (req, res) => res.json(await registry.mcp(req.body)));
+app.listen(3000);
+```
+
+### Remote servers
+
+Both `createHandler` (via the config's `remote` key) and `createRegistry` (via `options.remote`) federate tools from other MCP servers over HTTP. Their tools are merged in namespaced as `servername.toolname`; a local tool with the same name overrides the remote one. `auth` accepts a literal token or `env:VAR`, and `tools` limits which upstream tools are exposed:
+
+```js
+const registry = await createRegistry(tools, {
+  remote: [{ name: 'billing', url: 'https://billing.internal/mcp', auth: 'env:BILLING_TOKEN', tools: ['create_invoice'] }],
+});
+```
 
 ## Configuration
 
@@ -178,9 +255,8 @@ Optional `zeromcp.config.json`:
 ```json
 {
   "tools": ["./tools"],
-  "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242, "auth": "env:TOKEN" }
+  "remote": [
+    { "name": "billing", "url": "https://billing.internal/mcp", "auth": "env:BILLING_TOKEN" }
   ],
   "autoload_tools": true,
   "logging": true,
@@ -190,6 +266,8 @@ Optional `zeromcp.config.json`:
   }
 }
 ```
+
+Stdio is the only transport `zeromcp serve` runs, and the default. `autoload_tools: true` watches the tool directories and sends `notifications/tools/list_changed` when a tool file changes.
 
 ## Testing
 

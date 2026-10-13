@@ -10,7 +10,7 @@ const command = args[0];
 
 if (!command || !['serve', 'audit'].includes(command)) {
   console.error('Usage:');
-  console.error('  zeromcp serve [tools-directory...] [stdio|http] [--config <path>]');
+  console.error('  zeromcp serve [tools-directory...] [stdio] [--config <path>]');
   console.error('  zeromcp audit [tools-directory...]');
   process.exit(1);
 }
@@ -57,11 +57,11 @@ if (command === 'serve') {
   // CLI transport args
   const cliTransports = args.slice(1).filter(a => a === 'stdio' || a === 'http');
   if (cliTransports.length > 0) {
-    config.transport = cliTransports.map(t => {
-      if (t === 'http') return { type: 'http', port: 4242 };
-      return { type: t };
-    });
+    config.transport = cliTransports.map(t => ({ type: t }));
   }
 
-  serve(config);
+  serve(config).catch(err => {
+    console.error(`[zeromcp] ${err.message}`);
+    process.exit(1);
+  });
 }
