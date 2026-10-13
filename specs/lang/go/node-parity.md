@@ -1,7 +1,7 @@
 # Node parity — Go
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: `go test -race ./pkg/...` 85/85 pass (new remote, registry, runtime, notify, watcher, buildName, ResolveToolSources, resource-scanner tests); conformance `--language Go` all suites pass as before.
 
 ## Gaps
 1. Remote federation (`remote` config)

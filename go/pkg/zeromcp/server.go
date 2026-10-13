@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"regexp"
 	"sort"
@@ -73,21 +71,25 @@ type PromptDef struct {
 
 // Server is a zero-config MCP server.
 type Server struct {
-	mu                sync.RWMutex
-	tools             map[string]*registeredTool
-	resources         map[string]*registeredResource
-	templates         map[string]*registeredTemplate
-	prompts           map[string]*registeredPrompt
-	subscriptions     map[string]bool
-	logLevel          string
-	cfg               Config
-	credentialCache   map[string]any
+	mu              sync.RWMutex
+	tools           map[string]*registeredTool
+	resources       map[string]*registeredResource
+	templates       map[string]*registeredTemplate
+	prompts         map[string]*registeredPrompt
+	subscriptions   map[string]bool
+	logLevel        string
+	cfg             Config
+	credentialCache map[string]any
+	getRuntime      func() any        // set by SetRuntime; guarded by mu
+	notify          func(line []byte) // set by serveStdio; guarded by mu
+	stdoutMu        sync.Mutex        // serializes stdio writes (responses and notifications)
 }
 
 type registeredTool struct {
 	tool         Tool
 	ctx          *Ctx
 	cachedSchema JsonSchema
+	remote       bool
 }
 
 type registeredResource struct {
@@ -114,10 +116,10 @@ type jsonRPCRequest struct {
 }
 
 type jsonRPCResponse struct {
-	JSONRPC string       `json:"jsonrpc"`
-	ID      any          `json:"id,omitempty"`
-	Result  any          `json:"result,omitempty"`
-	Error   *jsonRPCErr  `json:"error,omitempty"`
+	JSONRPC string      `json:"jsonrpc"`
+	ID      any         `json:"id,omitempty"`
+	Result  any         `json:"result,omitempty"`
+	Error   *jsonRPCErr `json:"error,omitempty"`
 }
 
 type jsonRPCErr struct {
@@ -140,7 +142,7 @@ func newServer(cfg Config) *Server {
 	icon := resolveIcon(cfg.Icon)
 	cfg.Icon = icon
 
-	return &Server{
+	s := &Server{
 		tools:           make(map[string]*registeredTool),
 		resources:       make(map[string]*registeredResource),
 		templates:       make(map[string]*registeredTemplate),
@@ -150,6 +152,81 @@ func newServer(cfg Config) *Server {
 		cfg:             cfg,
 		credentialCache: make(map[string]any),
 	}
+
+	// Remote tools go in first; local registrations (Tool, Scanner.RegisterAll)
+	// come later and override them. This blocks on the network, the Go
+	// equivalent of Node awaiting remoteManager.connect.
+	if len(cfg.Remote) > 0 {
+		for _, rt := range connectRemotes(cfg.Remote) {
+			ctx := NewContext(rt.name, nil, SandboxOptions{
+				Logging: cfg.Logging,
+				Bypass:  cfg.BypassPermissions,
+			}, nil)
+			t := rt.tool
+			t.Route = nil
+			t.Permissions = nil
+			s.tools[rt.name] = &registeredTool{tool: t, ctx: ctx, cachedSchema: ToJsonSchema(t.Input), remote: true}
+		}
+	}
+
+	return s
+}
+
+// SetRuntime installs a function called on every local tool execution;
+// a non-nil result is exposed to the tool as ctx.Runtime. It covers the
+// stdio transport, HandleRequest/HandleRequestBytes, and Registry()
+// (MCP and Routes[i].Invoke).
+func (s *Server) SetRuntime(get func() any) {
+	s.mu.Lock()
+	s.getRuntime = get
+	s.mu.Unlock()
+}
+
+// execCtx returns the ctx for one execution of rt: the shared ctx, or a
+// per-call copy carrying the runtime value. Must be called without s.mu held.
+func (s *Server) execCtx(rt *registeredTool) *Ctx {
+	if rt.remote {
+		return rt.ctx
+	}
+	s.mu.RLock()
+	get := s.getRuntime
+	s.mu.RUnlock()
+	if get == nil {
+		return rt.ctx
+	}
+	v := get()
+	if v == nil {
+		return rt.ctx
+	}
+	c := *rt.ctx
+	c.Runtime = v
+	return &c
+}
+
+// Notify sends a JSON-RPC notification on the stdio transport; no-op if stdio isn't running.
+func (s *Server) Notify(method string, params any) {
+	s.mu.RLock()
+	notify := s.notify
+	s.mu.RUnlock()
+	if notify == nil {
+		return
+	}
+	msg := map[string]any{"jsonrpc": "2.0", "method": method}
+	if params != nil {
+		msg["params"] = params
+	}
+	line, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	notify(line)
+}
+
+// writeStdout writes one line to stdout, serialized with notifications.
+func (s *Server) writeStdout(line []byte) {
+	s.stdoutMu.Lock()
+	defer s.stdoutMu.Unlock()
+	fmt.Fprintf(os.Stdout, "%s\n", line)
 }
 
 // ResolveToolCredentials resolves credentials for the given namespace key.
@@ -201,6 +278,10 @@ func (s *Server) Tool(name string, t Tool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if existing, ok := s.tools[name]; ok && existing.remote {
+		fmt.Fprintf(os.Stderr, "[zeromcp] Local tool \"%s\" overrides remote\n", name)
+	}
+
 	ValidatePermissions(name, t.Permissions)
 
 	var creds any
@@ -242,44 +323,32 @@ func (s *Server) Prompt(name string, p PromptDef) {
 	fmt.Fprintf(os.Stderr, "[zeromcp] Registered prompt: %s\n", name)
 }
 
-// Serve starts the server on the configured transports.
-// Default is stdio. Call this as the last line in main().
+// Serve starts the stdio transport, the only transport ZeroMCP runs itself.
+// To serve over HTTP, mount Registry() in your own HTTP server.
+// Call this as the last line in main().
 func (s *Server) Serve() {
-	transports := ResolveTransports(s.cfg)
-	hasHTTP := false
-	for _, t := range transports {
-		if t.Type == "http" {
-			hasHTTP = true
-		}
-	}
-
-	for _, t := range transports {
-		switch t.Type {
-		case "stdio":
-			go s.serveStdio(hasHTTP)
-		case "http":
-			port := t.Port
-			if port == 0 {
-				port = 4242
-			}
-			go s.serveHTTP(port, t.Auth)
-		}
+	if err := checkTransports(s.cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
 	}
 
 	s.logReadyCounts()
-
-	// Block forever
-	select {}
+	s.serveStdio()
 }
 
 // ServeStdio starts only the stdio transport (convenience for simple use).
 func (s *Server) ServeStdio() {
 	s.logReadyCounts()
-	s.serveStdio(false)
+	s.serveStdio()
 }
 
-func (s *Server) serveStdio(httpAlso bool) {
+func (s *Server) serveStdio() {
 	fmt.Fprintf(os.Stderr, "[zeromcp] stdio transport ready\n")
+
+	s.mu.Lock()
+	s.notify = s.writeStdout
+	s.mu.Unlock()
+
 	scanner := bufio.NewScanner(os.Stdin)
 	// Increase buffer size for large requests (10MB to handle giant_string payloads)
 	const maxBuf = 10 * 1024 * 1024
@@ -295,160 +364,10 @@ func (s *Server) serveStdio(httpAlso bool) {
 		if out == nil {
 			continue
 		}
-		fmt.Fprintf(os.Stdout, "%s\n", out)
+		s.writeStdout(out)
 	}
 
-	if !httpAlso {
-		os.Exit(0)
-	}
-}
-
-func (s *Server) serveHTTP(port int, authConfig string) {
-	expectedToken := ResolveAuth(authConfig)
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			writeCORS(w)
-			return
-		}
-		if r.Method != "GET" {
-			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
-			return
-		}
-		setCORS(w)
-		s.mu.RLock()
-		count := len(s.tools)
-		s.mu.RUnlock()
-		httpJSON(w, map[string]any{"status": "ok", "tools": count}, 200)
-	})
-
-	mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			writeCORS(w)
-			return
-		}
-		if r.Method != "GET" {
-			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
-			return
-		}
-		setCORS(w)
-		spec := s.buildOpenAPISpec()
-		httpJSON(w, spec, 200)
-	})
-
-	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			writeCORS(w)
-			return
-		}
-		if r.Method != "GET" {
-			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(200)
-		w.Write([]byte(`<!DOCTYPE html>
-<html>
-<head>
-  <title>ZeroMCP API</title>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
-<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-</body>
-</html>`))
-	})
-
-	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			writeCORS(w)
-			return
-		}
-		if r.Method != "POST" {
-			httpJSON(w, map[string]string{"error": "Method not allowed"}, 405)
-			return
-		}
-		setCORS(w)
-
-		// Auth check
-		if expectedToken != "" {
-			auth := r.Header.Get("Authorization")
-			if auth != "Bearer "+expectedToken {
-				httpJSON(w, map[string]string{"error": "Unauthorized"}, 401)
-				return
-			}
-		}
-
-		body, err := readBody(r.Body)
-		if err != nil {
-			httpJSON(w, jsonRPCResponse{JSONRPC: "2.0", Error: &jsonRPCErr{Code: -32700, Message: "Parse error"}}, 200)
-			return
-		}
-
-		out := s.HandleRequestBytes(body)
-		if out == nil {
-			httpJSON(w, jsonRPCResponse{JSONRPC: "2.0", Result: map[string]any{}}, 200)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write(out)
-		w.Write([]byte("\n"))
-	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" {
-			writeCORS(w)
-			return
-		}
-		setCORS(w)
-
-		// Route-based tool dispatch
-		if handled := s.handleToolRoute(w, r); handled {
-			return
-		}
-
-		httpJSON(w, map[string]any{
-			"error": "Not found",
-			"endpoints": map[string]string{
-				"POST /mcp":   "MCP JSON-RPC",
-				"GET /health": "Health check",
-			},
-		}, 404)
-	})
-
-	fmt.Fprintf(os.Stderr, "[zeromcp] http transport ready on port %d\n", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), mux); err != nil {
-		fmt.Fprintf(os.Stderr, "[zeromcp] HTTP server error: %v\n", err)
-	}
-}
-
-func setCORS(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-}
-
-func writeCORS(w http.ResponseWriter) {
-	setCORS(w)
-	w.WriteHeader(204)
-}
-
-func readBody(r io.ReadCloser) ([]byte, error) {
-	defer r.Close()
-	return io.ReadAll(r)
-}
-
-func httpJSON(w http.ResponseWriter, data any, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	os.Exit(0)
 }
 
 // HandleRequestBytes processes raw JSON-RPC bytes and returns raw JSON bytes.
@@ -870,9 +789,10 @@ func (s *Server) callTool(params map[string]any) map[string]any {
 		val any
 		err error
 	}
+	execCtx := s.execCtx(rt)
 	ch := make(chan executeResult, 1)
 	go func() {
-		v, e := rt.tool.Execute(args, rt.ctx)
+		v, e := rt.tool.Execute(args, execCtx)
 		ch <- executeResult{v, e}
 	}()
 
@@ -911,64 +831,6 @@ func (s *Server) callTool(params map[string]any) map[string]any {
 	return map[string]any{
 		"content": []map[string]any{{"type": "text", "text": text}},
 	}
-}
-
-// --- Route dispatch ---
-
-// handleToolRoute checks if the incoming request matches any registered tool route.
-// Returns true if the request was handled (even on error), false if no route matched.
-func (s *Server) handleToolRoute(w http.ResponseWriter, r *http.Request) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for name, rt := range s.tools {
-		if rt.tool.Route == nil {
-			continue
-		}
-		route := rt.tool.Route
-		if !strings.EqualFold(route.Method, r.Method) {
-			continue
-		}
-		pathParams := matchRoutePath(route.Path, r.URL.Path)
-		if pathParams == nil {
-			continue
-		}
-
-		// Build args from path params + query/body
-		args := make(map[string]any)
-		for k, v := range pathParams {
-			args[k] = v
-		}
-
-		if strings.EqualFold(r.Method, "GET") {
-			for k, vals := range r.URL.Query() {
-				if len(vals) > 0 {
-					args[k] = vals[0]
-				}
-			}
-		} else {
-			body, err := readBody(r.Body)
-			if err == nil && len(body) > 0 {
-				var bodyMap map[string]any
-				if json.Unmarshal(body, &bodyMap) == nil {
-					for k, v := range bodyMap {
-						args[k] = v
-					}
-				}
-			}
-		}
-
-		result, err := rt.tool.Execute(args, rt.ctx)
-		_ = name
-		if err != nil {
-			httpJSON(w, map[string]any{"ok": false, "error": err.Error()}, 500)
-			return true
-		}
-		httpJSON(w, map[string]any{"ok": true, "result": result}, 200)
-		return true
-	}
-
-	return false
 }
 
 // buildOpenAPISpec generates an OpenAPI 3.0 spec from all tools that have a Route field.
@@ -1120,26 +982,6 @@ func fieldDefToOpenAPISchema(fieldDef any) map[string]any {
 	default:
 		return map[string]any{"type": "string"}
 	}
-}
-
-// matchRoutePath matches a URL path against a route pattern with :param segments.
-// Returns a map of param names to values, or nil if the path does not match.
-func matchRoutePath(pattern, urlPath string) map[string]string {
-	patternParts := strings.Split(strings.Trim(pattern, "/"), "/")
-	pathParts := strings.Split(strings.Trim(urlPath, "/"), "/")
-	if len(patternParts) != len(pathParts) {
-		return nil
-	}
-
-	params := make(map[string]string)
-	for i, pp := range patternParts {
-		if strings.HasPrefix(pp, ":") {
-			params[pp[1:]] = pathParts[i]
-		} else if pp != pathParts[i] {
-			return nil
-		}
-	}
-	return params
 }
 
 // --- Utilities ---

@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Go
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: unit tests 85/85 pass; run-route.js Go 5/5 via the Registry() harness; `http` transport exits 1 with the "was removed" message (CLI and in-code); the removal grep returns nothing.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `(*Server).Registry()` (`go/pkg/zeromcp/registry.go:33`: `Routes`, `OpenAPI`, `MCP` as plain data) and `(*Server).HandleRequestBytes` / `HandleRequest` (`server.go:457`, `server.go:487`) already cover that. The built-in `net/http` server inside `Serve()` is the one piece where ZeroMCP binds a port itself.
