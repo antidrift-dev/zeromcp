@@ -2,7 +2,7 @@
 
 /**
  * HTTP transport + Bearer auth conformance tests.
- * Tests Node.js and Go HTTP server implementations.
+ * Tests the Node.js HTTP server implementation.
  */
 
 import { spawn } from 'node:child_process';
@@ -15,16 +15,9 @@ const root = join(__dirname, '..', '..');
 
 const TOKEN = 'test-token-xyz-789';
 
-const implementations = [
-  {
-    name: 'Go',
-    command: 'bash',
-    args: ['-c', `cp ${join(__dirname, 'http-config-go.json')} /tmp/zeromcp.config.json && cd /tmp && zeromcp-go-advanced`],
-    env: { TEST_MCP_TOKEN: TOKEN },
-    port: 14243,
-    optional: true,
-  },
-];
+// HTTP bearer auth belonged to the built-in HTTP servers, which no language ships
+// anymore (decisions log, 2026-10-13). Auth is the host framework's job.
+const implementations = [];
 
 const noAuthImplementations = [
   {
