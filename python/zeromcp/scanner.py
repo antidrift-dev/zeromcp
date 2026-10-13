@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any, Callable
 
 from .config import resolve_credentials, resolve_sources, resolve_tool_sources
 from .sandbox import create_sandbox, validate_permissions
 from .schema import to_json_schema
 
+# How often autoload_tools checks tool files for changes. The standard library
+# has no recursive filesystem watcher, so watch() polls mtimes instead.
+_AUTOLOAD_POLL_INTERVAL = 0.5  # seconds
+
 
 class ToolScanner:
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, *, get_runtime: Callable[[], Any] | None = None):
         config = config or {}
         self.tools: dict = {}
         self.sources = resolve_tool_sources(config.get("tools"))
@@ -23,6 +29,8 @@ class ToolScanner:
         self.cache_credentials: bool = config.get("cache_credentials", True)
         self.logging: bool = config.get("logging", False)
         self.bypass: bool = config.get("bypass_permissions", False)
+        self.get_runtime = get_runtime
+        self._watch_tasks: list[asyncio.Task] = []
 
     def scan(self) -> dict:
         """Scan all tool sources and return a dict of name -> ToolDefinition."""
@@ -31,6 +39,45 @@ class ToolScanner:
             root_dir = Path(source["path"]).resolve()
             self._scan_dir(root_dir, root_dir, source.get("prefix"))
         return self.tools
+
+    async def watch(self, on_change: Callable[[dict], None] | None = None) -> None:
+        """Poll tool sources; on any added, changed or removed .py file, rescan and call on_change."""
+        task = asyncio.current_task()
+        if task:
+            self._watch_tasks.append(task)
+        snapshot = self._snapshot()
+        while True:
+            await asyncio.sleep(_AUTOLOAD_POLL_INTERVAL)
+            current = self._snapshot()
+            if current == snapshot:
+                continue
+            changed = {path for path, _ in set(current.items()) ^ set(snapshot.items())}
+            for _, rel in sorted(changed):
+                _log(f"Change detected: {rel}")
+            snapshot = current
+            self.scan()
+            if on_change:
+                on_change(self.tools)
+
+    def stop(self) -> None:
+        for task in self._watch_tasks:
+            task.cancel()
+        self._watch_tasks.clear()
+
+    def _snapshot(self) -> dict:
+        files: dict = {}
+        for source in self.sources:
+            root_dir = Path(source["path"]).resolve()
+            try:
+                paths = list(root_dir.rglob("*.py"))
+            except OSError:
+                continue
+            for path in paths:
+                try:
+                    files[(str(root_dir), path.relative_to(root_dir).as_posix())] = path.stat().st_mtime_ns
+                except OSError:
+                    pass
+        return files
 
     def _scan_dir(self, directory: Path, root_dir: Path, source_prefix: str | None) -> None:
         try:
@@ -110,7 +157,8 @@ class ToolScanner:
 
         async def wrapped_execute(args: dict, _fp=file_path, _rd=root_dir, _fetch=sandbox["fetch"]):
             creds = scanner._resolve_credentials(_fp, _rd)
-            _ctx = _ToolContext(credentials=creds, fetch=_fetch)
+            runtime = scanner.get_runtime() if scanner.get_runtime else None
+            _ctx = _ToolContext(credentials=creds, fetch=_fetch, runtime=runtime)
             return await raw_execute(args, _ctx)
 
         input_schema = tool_meta.get("input", {})
@@ -132,9 +180,10 @@ class ToolScanner:
 class _ToolContext:
     """Context object passed to tool execute functions."""
 
-    def __init__(self, credentials=None, fetch=None):
+    def __init__(self, credentials=None, fetch=None, runtime=None):
         self.credentials = credentials
         self.fetch = fetch
+        self.runtime = runtime
 
 
 MIME_MAP = {

@@ -3,3 +3,4 @@
 __version__ = "0.2.0"
 
 from .server import create_handler, serve  # noqa: F401
+from .registry import create_registry  # noqa: F401

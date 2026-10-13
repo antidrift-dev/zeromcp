@@ -9,19 +9,36 @@ import json
 import re
 import sys
 
+from typing import Any, Callable
+
 from .config import load_config, resolve_icon, resolve_transports
+from .remote import RemoteManager
 from .scanner import PromptScanner, ResourceScanner, ToolScanner
 from .schema import validate
 
 
-def _build_state(config: dict) -> dict:
-    """Build server state from config: scan tools, resources, prompts."""
+async def _build_state(
+    config: dict,
+    *,
+    exit_without_sources: bool = False,
+    get_runtime: Callable[[], Any] | None = None,
+) -> dict:
+    """Build server state from config: connect remotes, scan tools, resources, prompts."""
     all_tools: dict = {}
-    scanner = ToolScanner(config)
+    if config.get("remote"):
+        all_tools.update(await RemoteManager().connect(config["remote"]))
+
+    scanner = ToolScanner(config, get_runtime=get_runtime)
     try:
         scanner.scan()
-        all_tools.update(scanner.tools)
+        for name, tool in scanner.tools.items():
+            if name in all_tools:
+                _log(f'Local tool "{name}" overrides remote')
+            all_tools[name] = tool
     except Exception:
+        if exit_without_sources and not (config.get("remote") or config.get("resources") or config.get("prompts")):
+            _log("No tools directory and no remote servers configured")
+            sys.exit(1)
         _log("No tools directory found")
 
     all_resources: dict = {}
@@ -60,10 +77,15 @@ def _build_state(config: dict) -> dict:
         "log_level": "info",
         "icon": icon,
         "title": config.get("title", "ZeroMCP"),
+        "_tool_scanner": scanner,
     }
 
 
-async def create_handler(config_or_path: dict | str | None = None):
+async def create_handler(
+    config_or_path: dict | str | None = None,
+    *,
+    get_runtime: Callable[[], Any] | None = None,
+):
     """Create a handler function that processes JSON-RPC requests.
 
     Returns an async function: (request: dict) -> dict | None
@@ -72,6 +94,9 @@ async def create_handler(config_or_path: dict | str | None = None):
 
         handler = await create_handler("./tools")
         response = await handler(json_rpc_request)
+
+    ``get_runtime`` is called on every local tool call; its return value is
+    passed to the tool as ``ctx.runtime``.
 
     Works with any HTTP framework::
 
@@ -84,10 +109,10 @@ async def create_handler(config_or_path: dict | str | None = None):
     else:
         config = config_or_path or {}
 
-    state = _build_state(config)
+    state = await _build_state(config, get_runtime=get_runtime)
 
     async def handler(request: dict) -> dict | None:
-        return await _handle_request(request, state)
+        return await handle_request(request, state)
 
     return handler
 
@@ -99,7 +124,20 @@ async def serve(config_or_path: dict | str | None = None) -> None:
     else:
         config = config_or_path or {}
 
-    state = _build_state(config)
+    state = await _build_state(config, exit_without_sources=True)
+
+    # Hot reload
+    scanner = state["_tool_scanner"]
+    if config.get("autoload_tools"):
+        def on_change(tools: dict) -> None:
+            for name, tool in tools.items():
+                state["tools"][name] = tool
+            notify = state.get("notify")
+            if notify:
+                notify("notifications/tools/list_changed", {})
+
+        state["_watch_task"] = asyncio.create_task(scanner.watch(on_change))
+        _log("autoload_tools enabled — watching for changes")
 
     # Start transports
     transports = resolve_transports(config)
@@ -113,15 +151,19 @@ async def serve(config_or_path: dict | str | None = None) -> None:
             host = t.get("host", "127.0.0.1")
             tasks.append(_start_http(state, host, port))
 
-    if len(tasks) == 1:
-        await tasks[0]
-    elif tasks:
-        await asyncio.gather(*tasks)
+    try:
+        if len(tasks) == 1:
+            await tasks[0]
+        elif tasks:
+            await asyncio.gather(*tasks)
+    finally:
+        scanner.stop()
 
 
 async def _start_stdio(state: dict) -> None:
     """Read JSON-RPC requests line-by-line from stdin, write responses to stdout."""
     _log("stdio transport ready")
+    state["notify"] = _stdio_notify
 
     loop = asyncio.get_event_loop()
     reader = asyncio.StreamReader(limit=16 * 1024 * 1024)  # 16MB line limit
@@ -153,11 +195,20 @@ async def _start_stdio(state: dict) -> None:
         if not isinstance(request, dict):
             continue
 
-        response = await _handle_request(request, state)
+        response = await handle_request(request, state)
         if response is not None:
             out = json.dumps(response) + "\n"
             sys.stdout.write(out)
             sys.stdout.flush()
+
+
+def _stdio_notify(method: str, params: dict | None = None) -> None:
+    """Write a server-initiated JSON-RPC notification to stdout."""
+    notification: dict = {"jsonrpc": "2.0", "method": method}
+    if params is not None:
+        notification["params"] = params
+    sys.stdout.write(json.dumps(notification) + "\n")
+    sys.stdout.flush()
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +257,7 @@ def _match_template(template: str, uri: str) -> dict[str, str] | None:
 # ---------------------------------------------------------------------------
 
 
-async def _handle_request(request: dict, state: dict) -> dict | None:
+async def handle_request(request: dict, state: dict) -> dict | None:
     req_id = request.get("id")
     method = request.get("method", "")
     params = request.get("params", {})
@@ -243,7 +294,7 @@ async def _handle_request(request: dict, state: dict) -> dict | None:
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": capabilities,
-                "serverInfo": {"name": "zeromcp", "version": "0.2.0"},
+                "serverInfo": {"name": "zeromcp", "version": state.get("version", "0.2.0")},
             },
         }
 
@@ -525,7 +576,7 @@ async def _handle_http_route(tool: dict, path_params: dict, method: str, body: b
         return 500, {"ok": False, "error": str(exc)}
 
 
-def _build_openapi(state: dict) -> dict:
+def build_openapi(state: dict) -> dict:
     """Build an OpenAPI 3.0 spec from tools that have a route field."""
     title = state.get("title", "ZeroMCP")
     paths: dict = {}
@@ -583,7 +634,7 @@ def _build_openapi(state: dict) -> dict:
         paths[openapi_path][method] = operation
     return {
         "openapi": "3.0.0",
-        "info": {"title": title, "version": "0.5.0"},
+        "info": {"title": title, "version": state.get("version", "0.5.0")},
         "paths": paths,
     }
 
@@ -646,7 +697,7 @@ async def _start_http(state: dict, host: str, port: int) -> None:
 
             # /openapi.json — OpenAPI spec
             if pathname == "/openapi.json" and req_method == "GET":
-                spec = _build_openapi(state)
+                spec = build_openapi(state)
                 _http_respond(writer, 200, spec)
                 return
 
@@ -670,7 +721,7 @@ async def _start_http(state: dict, host: str, port: int) -> None:
                 except (json.JSONDecodeError, ValueError):
                     _http_respond(writer, 400, {"error": "invalid JSON"})
                     return
-                response = await _handle_request(request, state)
+                response = await handle_request(request, state)
                 _http_respond(writer, 200, response)
                 return
 

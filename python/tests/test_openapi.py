@@ -1,8 +1,8 @@
-"""Tests for OpenAPI spec generation (_build_openapi)."""
+"""Tests for OpenAPI spec generation (build_openapi)."""
 
 import unittest
 
-from zeromcp.server import _build_openapi
+from zeromcp.server import build_openapi
 
 
 def _make_state(tools, title="ZeroMCP"):
@@ -22,7 +22,7 @@ class TestBuildOpenApiGet(unittest.TestCase):
                 },
             },
         }
-        spec = _build_openapi(_make_state(tools))
+        spec = build_openapi(_make_state(tools))
         op = spec["paths"]["/items/{id}"]["get"]
         params_by_name = {p["name"]: p for p in op["parameters"]}
         self.assertEqual(params_by_name["id"]["in"], "path")
@@ -48,7 +48,7 @@ class TestBuildOpenApiNonGet(unittest.TestCase):
                 },
             },
         }
-        spec = _build_openapi(_make_state(tools))
+        spec = build_openapi(_make_state(tools))
         op = spec["paths"]["/items/{id}"]["put"]
 
         # Path param is documented as a parameter, not a body property.
@@ -81,7 +81,7 @@ class TestBuildOpenApiNonGet(unittest.TestCase):
                 },
             },
         }
-        spec = _build_openapi(_make_state(tools))
+        spec = build_openapi(_make_state(tools))
         op = spec["paths"]["/items"]["post"]
         self.assertNotIn("parameters", op)
         body_schema = op["requestBody"]["content"]["application/json"]["schema"]
@@ -100,7 +100,7 @@ class TestBuildOpenApiNonGet(unittest.TestCase):
                 },
             },
         }
-        spec = _build_openapi(_make_state(tools))
+        spec = build_openapi(_make_state(tools))
         op = spec["paths"]["/items/{id}"]["delete"]
         body_schema = op["requestBody"]["content"]["application/json"]["schema"]
         self.assertEqual(body_schema["properties"], {})

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Spec — not yet implemented.** This document is the Python port design for the framework-neutral registry shipped in Node.js (`nodejs/src/registry.ts`, see `specs/lang/nodejs/registry.md`). No code has been written yet; the module/function/class names below are the target design, not existing API.
+**Shipped** (2026-10-13) in `python/zeromcp/registry.py`, as designed below plus the Node additions in `node-parity.md` gap 4: `create_registry` is `async` and also takes `title`, `version`, `execute_timeout` and `remote`, and warns on duplicate routes. Covered by `python/tests/test_registry.py`.
 
 ## Motivation
 
