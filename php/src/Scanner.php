@@ -49,7 +49,7 @@ class Scanner
         foreach ($dirs as $d) {
             $dir = realpath($d) ?: $d;
             if (!is_dir($dir)) {
-                fwrite(STDERR, "[zeromcp] Cannot read tools directory: $dir\n");
+                Log::write("[zeromcp] Cannot read tools directory: $dir\n");
                 continue;
             }
             $this->scanDir($dir, $dir);
@@ -73,7 +73,7 @@ class Scanner
         foreach ($this->config->resourcesDirs as $d) {
             $dir = realpath($d) ?: $d;
             if (!is_dir($dir)) {
-                fwrite(STDERR, "[zeromcp] Cannot read resources directory: $dir\n");
+                Log::write("[zeromcp] Cannot read resources directory: $dir\n");
                 continue;
             }
             $this->scanResourceDir($dir, $dir);
@@ -94,7 +94,7 @@ class Scanner
         foreach ($this->config->promptsDirs as $d) {
             $dir = realpath($d) ?: $d;
             if (!is_dir($dir)) {
-                fwrite(STDERR, "[zeromcp] Cannot read prompts directory: $dir\n");
+                Log::write("[zeromcp] Cannot read prompts directory: $dir\n");
                 continue;
             }
             $this->scanPromptDir($dir, $dir);
@@ -143,10 +143,10 @@ class Scanner
 
             $this->tools[$name] = Tool::fromDefinition($name, $toolDef);
 
-            fwrite(STDERR, "[zeromcp] Loaded: $name\n");
+            Log::write("[zeromcp] Loaded: $name\n");
         } catch (\Throwable $e) {
             $rel = $this->relativePath($filePath, $rootDir);
-            fwrite(STDERR, "[zeromcp] Error loading $rel: {$e->getMessage()}\n");
+            Log::write("[zeromcp] Error loading $rel: {$e->getMessage()}\n");
         }
     }
 
@@ -177,7 +177,7 @@ class Scanner
         if (!empty($permissions['exec'])) $elevated[] = 'exec';
 
         if (!empty($elevated)) {
-            fwrite(STDERR, "[zeromcp] $name requests elevated permissions: " . implode(' | ', $elevated) . "\n");
+            Log::write("[zeromcp] $name requests elevated permissions: " . implode(' | ', $elevated) . "\n");
         }
     }
 
@@ -224,7 +224,7 @@ class Scanner
             }
         );
 
-        fwrite(STDERR, "[zeromcp] Resource loaded: $name ($uri)\n");
+        Log::write("[zeromcp] Resource loaded: $name ($uri)\n");
     }
 
     private function loadDynamicResource(string $filePath, string $rootDir): void
@@ -237,7 +237,7 @@ class Scanner
             $def = require $filePath;
 
             if (!is_array($def) || !isset($def['read']) || !is_callable($def['read'])) {
-                fwrite(STDERR, "[zeromcp] Resource $relPath: missing read() function\n");
+                Log::write("[zeromcp] Resource $relPath: missing read() function\n");
                 return;
             }
 
@@ -250,7 +250,7 @@ class Scanner
                     mimeType: $def['mimeType'] ?? 'text/plain',
                     read: $def['read']
                 );
-                fwrite(STDERR, "[zeromcp] Resource template loaded: $name ({$def['uriTemplate']})\n");
+                Log::write("[zeromcp] Resource template loaded: $name ({$def['uriTemplate']})\n");
             } else {
                 $uri = $def['uri'] ?? "resource:///$name";
                 $this->resources[$name] = new Resource(
@@ -260,10 +260,10 @@ class Scanner
                     mimeType: $def['mimeType'] ?? 'application/json',
                     read: $def['read']
                 );
-                fwrite(STDERR, "[zeromcp] Resource loaded: $name ($uri)\n");
+                Log::write("[zeromcp] Resource loaded: $name ($uri)\n");
             }
         } catch (\Throwable $e) {
-            fwrite(STDERR, "[zeromcp] Error loading resource $relPath: {$e->getMessage()}\n");
+            Log::write("[zeromcp] Error loading resource $relPath: {$e->getMessage()}\n");
         }
     }
 
@@ -298,7 +298,7 @@ class Scanner
             $def = require $filePath;
 
             if (!is_array($def) || !isset($def['render']) || !is_callable($def['render'])) {
-                fwrite(STDERR, "[zeromcp] Prompt $relPath: missing render() function\n");
+                Log::write("[zeromcp] Prompt $relPath: missing render() function\n");
                 return;
             }
 
@@ -324,9 +324,9 @@ class Scanner
                 render: $def['render']
             );
 
-            fwrite(STDERR, "[zeromcp] Prompt loaded: $name\n");
+            Log::write("[zeromcp] Prompt loaded: $name\n");
         } catch (\Throwable $e) {
-            fwrite(STDERR, "[zeromcp] Error loading prompt $relPath: {$e->getMessage()}\n");
+            Log::write("[zeromcp] Error loading prompt $relPath: {$e->getMessage()}\n");
         }
     }
 }

@@ -5,6 +5,7 @@
  * We use reflection to access them since they are private.
  */
 
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../src/Schema.php';
 require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/Tool.php';

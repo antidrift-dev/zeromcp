@@ -2,7 +2,10 @@ package zeromcp
 
 import (
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestRegistryRoutesOnlyIncludesRoutedTools(t *testing.T) {
@@ -153,5 +156,40 @@ func TestRegistryEmptyWhenNoRoutedTools(t *testing.T) {
 	reg := s.Registry()
 	if len(reg.Routes) != 0 {
 		t.Errorf("expected 0 routes, got %d", len(reg.Routes))
+	}
+}
+
+// Registry() used to hold s.mu.RLock while buildOpenAPISpec took it again; a
+// Tool() call waiting for the write lock in between deadlocked both.
+func TestRegistryDoesNotDeadlockWithConcurrentTool(t *testing.T) {
+	s := NewServer()
+	noop := func(args map[string]any, ctx *Ctx) (any, error) { return nil, nil }
+
+	done := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		for i := 0; i < 50; i++ {
+			wg.Add(2)
+			go func(i int) {
+				defer wg.Done()
+				s.Tool(fmt.Sprintf("t%d", i), Tool{
+					Input:   Input{},
+					Route:   &RouteConfig{Method: "GET", Path: fmt.Sprintf("/t%d", i)},
+					Execute: noop,
+				})
+			}(i)
+			go func() {
+				defer wg.Done()
+				s.Registry()
+			}()
+		}
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Registry() and Tool() deadlocked")
 	}
 }

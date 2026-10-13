@@ -31,6 +31,17 @@ type Registry struct {
 // ZeroMCP's tools into your own HTTP framework instead of using the
 // built-in server.
 func (s *Server) Registry() *Registry {
+	// buildOpenAPISpec takes s.mu itself, so build the routes under the lock
+	// and release it first: re-acquiring an RLock while a writer waits deadlocks.
+	routes := s.registryRoutes()
+	return &Registry{
+		Routes:  routes,
+		OpenAPI: s.buildOpenAPISpec(),
+		MCP:     s.HandleRequestBytes,
+	}
+}
+
+func (s *Server) registryRoutes() []RouteDefinition {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -57,9 +68,5 @@ func (s *Server) Registry() *Registry {
 		})
 	}
 
-	return &Registry{
-		Routes:  routes,
-		OpenAPI: s.buildOpenAPISpec(),
-		MCP:     s.HandleRequestBytes,
-	}
+	return routes
 }

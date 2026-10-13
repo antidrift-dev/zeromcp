@@ -87,6 +87,6 @@ class Sandbox
 
     private static function log(string $msg): void
     {
-        fwrite(STDERR, "[zeromcp] $msg\n");
+        Log::write("[zeromcp] $msg\n");
     }
 }

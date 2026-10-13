@@ -63,15 +63,15 @@ class Server
     public function loadTools(): void
     {
         $this->tools = $this->scanner->scan();
-        fwrite(STDERR, "[zeromcp] " . count($this->tools) . " tool(s) loaded\n");
+        Log::write("[zeromcp] " . count($this->tools) . " tool(s) loaded\n");
 
         $result = $this->scanner->scanResources();
         $this->resources = $result['resources'];
         $this->templates = $result['templates'];
-        fwrite(STDERR, "[zeromcp] " . count($this->resources) . " resource(s), " . count($this->templates) . " template(s) loaded\n");
+        Log::write("[zeromcp] " . count($this->resources) . " resource(s), " . count($this->templates) . " template(s) loaded\n");
 
         $this->prompts = $this->scanner->scanPrompts();
-        fwrite(STDERR, "[zeromcp] " . count($this->prompts) . " prompt(s) loaded\n");
+        Log::write("[zeromcp] " . count($this->prompts) . " prompt(s) loaded\n");
 
         $this->icon = $this->resolveIcon($this->config->icon);
     }
@@ -88,7 +88,7 @@ class Server
     public function serveHttp(): void
     {
         $this->loadTools();
-        fwrite(STDERR, "[zeromcp] HTTP transport ready\n");
+        Log::write("[zeromcp] HTTP transport ready\n");
 
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
@@ -273,7 +273,7 @@ HTML;
     public function serve(): void
     {
         $this->loadTools();
-        fwrite(STDERR, "[zeromcp] stdio transport ready\n");
+        Log::write("[zeromcp] stdio transport ready\n");
 
         $stdin = fopen('php://stdin', 'r');
 
@@ -796,7 +796,7 @@ HTML;
                 $ctx = stream_context_create(['http' => ['timeout' => 10]]);
                 $data = @file_get_contents($icon, false, $ctx);
                 if ($data === false) {
-                    fwrite(STDERR, "[zeromcp] Warning: failed to fetch icon $icon\n");
+                    Log::write("[zeromcp] Warning: failed to fetch icon $icon\n");
                     return null;
                 }
                 // Try to get content-type from response headers
@@ -811,7 +811,7 @@ HTML;
                 }
                 return 'data:' . $contentType . ';base64,' . base64_encode($data);
             } catch (\Throwable $e) {
-                fwrite(STDERR, "[zeromcp] Warning: failed to fetch icon $icon: {$e->getMessage()}\n");
+                Log::write("[zeromcp] Warning: failed to fetch icon $icon: {$e->getMessage()}\n");
                 return null;
             }
         }
@@ -823,19 +823,19 @@ HTML;
                 $path = (getenv('HOME') ?: '') . substr($path, 1);
             }
             if (!file_exists($path)) {
-                fwrite(STDERR, "[zeromcp] Warning: icon file not found: $path\n");
+                Log::write("[zeromcp] Warning: icon file not found: $path\n");
                 return null;
             }
             $data = file_get_contents($path);
             if ($data === false) {
-                fwrite(STDERR, "[zeromcp] Warning: failed to read icon file: $path\n");
+                Log::write("[zeromcp] Warning: failed to read icon file: $path\n");
                 return null;
             }
             $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
             $mime = self::ICON_MIME[$ext] ?? 'image/png';
             return 'data:' . $mime . ';base64,' . base64_encode($data);
         } catch (\Throwable $e) {
-            fwrite(STDERR, "[zeromcp] Warning: failed to read icon file $icon: {$e->getMessage()}\n");
+            Log::write("[zeromcp] Warning: failed to read icon file $icon: {$e->getMessage()}\n");
             return null;
         }
     }

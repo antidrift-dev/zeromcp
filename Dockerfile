@@ -59,6 +59,9 @@ ENV PATH="/usr/local/bin:${PATH}"
 WORKDIR /zeromcp
 COPY . .
 
+# Build Node
+RUN cd nodejs && npm ci --ignore-scripts && npm run build
+
 # Build Go
 RUN cd go && go build -o /usr/local/bin/zeromcp-go ./examples/basic/
 RUN cd go && go build -o /usr/local/bin/zeromcp-go-sandbox ./examples/sandbox-test/
