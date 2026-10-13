@@ -8,8 +8,10 @@ require_once __DIR__ . '/../src/Resource.php';
 require_once __DIR__ . '/../src/Prompt.php';
 require_once __DIR__ . '/../src/Scanner.php';
 require_once __DIR__ . '/../src/Sandbox.php';
+require_once __DIR__ . '/../src/RemoteManager.php';
 require_once __DIR__ . '/../src/Server.php';
 require_once __DIR__ . '/../src/Registry.php';
+require_once __DIR__ . '/fixtures/remote/FakeUpstream.php';
 
 use ZeroMcp\Config;
 use ZeroMcp\Registry;
@@ -32,6 +34,16 @@ class RegistryTest
         $this->testAcceptsRawDefinitionArrays();
         $this->testEmptyWhenNoRoutedTools();
         $this->testDefaultConfigDoesNotLoadFromDisk();
+
+        $upstream = new FakeUpstream();
+        $upstream->start();
+        try {
+            $this->testRemoteToolsInMcp($upstream);
+            $this->testLocalOverridesRemote($upstream);
+            $this->testRemoteAbsentFromRoutesAndOpenApi($upstream);
+        } finally {
+            $upstream->stop();
+        }
 
         echo "\n{$this->passed} passed, {$this->failed} failed\n";
         if ($this->failed > 0) exit(1);
@@ -164,6 +176,43 @@ class RegistryTest
         // Should build cleanly using in-memory Config([]) defaults, not Config::load().
         $registry = Registry::create(['greet' => $this->routedTool()]);
         $this->assert($registry->openapi['info']['title'] === 'ZeroMCP', 'default config title is the in-memory default');
+    }
+
+    private function testRemoteToolsInMcp(FakeUpstream $upstream): void
+    {
+        $registry = Registry::create([], ['remote' => [['name' => 'probeo', 'url' => $upstream->url()]]]);
+        $listed = $registry->mcp(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']);
+        $names = array_column($listed['result']['tools'], 'name');
+        $this->assert($names === ['probeo.list_pages', 'probeo.get_page'], 'remote tools appear in mcp tools/list');
+
+        $called = $registry->mcp([
+            'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call',
+            'params' => ['name' => 'probeo.list_pages', 'arguments' => ['domain' => 'example.com']],
+        ]);
+        $this->assert($called['result']['content'][0]['text'] === json_encode(['pages' => []]), 'mcp tools/call returns upstream text');
+    }
+
+    private function testLocalOverridesRemote(FakeUpstream $upstream): void
+    {
+        $registry = Registry::create(
+            ['probeo.list_pages' => new Tool(name: 'probeo.list_pages', description: 'local', execute: fn($a, $c) => 'local')],
+            ['remote' => [['name' => 'probeo', 'url' => $upstream->url()]]],
+        );
+        $called = $registry->mcp([
+            'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call',
+            'params' => ['name' => 'probeo.list_pages', 'arguments' => []],
+        ]);
+        $this->assert($called['result']['content'][0]['text'] === 'local', 'local tool overrides remote tool in registry');
+    }
+
+    private function testRemoteAbsentFromRoutesAndOpenApi(FakeUpstream $upstream): void
+    {
+        $registry = Registry::create(
+            ['greet' => $this->routedTool()],
+            ['remote' => [['name' => 'probeo', 'url' => $upstream->url()]]],
+        );
+        $this->assert(array_map(fn($r) => $r->name, $registry->routes) === ['greet'], 'routes contain no remote tools');
+        $this->assert(array_keys((array) $registry->openapi['paths']) === ['/greet/{name}'], 'openapi paths contain no remote tools');
     }
 }
 

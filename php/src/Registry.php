@@ -36,7 +36,10 @@ final class Registry
      * @param array{
      *   get_env?: callable(): mixed,
      *   config?: Config,
-     * } $options
+     *   remote?: array<int, array{name: string, url: string, auth?: string, tools?: string[]}>,
+     * } $options  `remote` servers are connected synchronously (blocking HTTP calls);
+     *   their tools are reachable through mcp() but never appear in routes/openapi.
+     *   Local tools with the same name override remote ones.
      */
     public static function create(array $tools, array $options = []): self
     {
@@ -45,7 +48,18 @@ final class Registry
             $normalized[$name] = $tool instanceof Tool ? $tool : Tool::fromDefinition($name, $tool);
         }
 
-        $server = Server::fromTools($normalized, $options['config'] ?? null, $options['get_env'] ?? null);
+        $merged = [];
+        if (!empty($options['remote'])) {
+            $merged = (new RemoteManager())->connect($options['remote']);
+        }
+        foreach ($normalized as $name => $tool) {
+            if (isset($merged[$name])) {
+                Log::write("[zeromcp] Local tool \"$name\" overrides remote\n");
+            }
+            $merged[$name] = $tool;
+        }
+
+        $server = Server::fromTools($merged, $options['config'] ?? null, $options['get_env'] ?? null);
 
         $routes = [];
         foreach ($normalized as $name => $tool) {

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../src/Resource.php';
 require_once __DIR__ . '/../src/Prompt.php';
 require_once __DIR__ . '/../src/Scanner.php';
 require_once __DIR__ . '/../src/Sandbox.php';
+require_once __DIR__ . '/../src/RemoteManager.php';
 require_once __DIR__ . '/../src/Server.php';
 
 use ZeroMcp\Config;
@@ -42,6 +43,11 @@ class ServerTest
         $this->testPagination();
         $this->testPaginationCursor();
         $this->testOpenApiNonGetRoutePathParam();
+        $this->testRuntimeContext();
+        $this->testRuntimeInvokedPerCall();
+        $this->testRuntimeNullWithoutOption();
+        $this->testCredentialsFollowDirectoryAfterRename();
+        $this->testAutoloadTools();
 
         echo "\n{$this->passed} passed, {$this->failed} failed\n";
         if ($this->failed > 0) exit(1);
@@ -412,6 +418,133 @@ class ServerTest
         $this->assert(!array_key_exists('id', $bodySchema['properties'] ?? []), 'path param excluded from body properties');
         $this->assert(array_key_exists('name', $bodySchema['properties'] ?? []), 'non-path param still in body properties');
         $this->assert(!in_array('id', $bodySchema['required'] ?? [], true), 'path param excluded from body required list');
+    }
+
+    private function callWhoami(Server $server, int $id = 1): mixed
+    {
+        $resp = $server->handleRequest([
+            'jsonrpc' => '2.0', 'id' => $id, 'method' => 'tools/call',
+            'params' => ['name' => 'whoami', 'arguments' => []],
+        ]);
+        return json_decode($resp['result']['content'][0]['text'], true);
+    }
+
+    private function testRuntimeContext(): void
+    {
+        $config = new Config(['tools' => __DIR__ . '/fixtures/runtime_tools']);
+        $server = new Server($config, ['get_runtime' => fn() => ['db' => 'x']]);
+        $server->loadTools();
+        $this->assert($this->callWhoami($server) === ['runtime' => ['db' => 'x']], 'get_runtime value lands on $ctx->runtime');
+    }
+
+    private function testRuntimeInvokedPerCall(): void
+    {
+        $count = 0;
+        $config = new Config(['tools' => __DIR__ . '/fixtures/runtime_tools']);
+        $server = new Server($config, ['get_runtime' => function () use (&$count) { return ++$count; }]);
+        $server->loadTools();
+        $first = $this->callWhoami($server, 1);
+        $second = $this->callWhoami($server, 2);
+        $this->assert($first === ['runtime' => 1] && $second === ['runtime' => 2] && $count === 2, 'get_runtime invoked once per tools/call');
+    }
+
+    private function testRuntimeNullWithoutOption(): void
+    {
+        $server = new Server(new Config(['tools' => __DIR__ . '/fixtures/runtime_tools']));
+        $server->loadTools();
+        $this->assert($this->callWhoami($server) === ['runtime' => null], '$ctx->runtime is null without get_runtime');
+    }
+
+    private function testCredentialsFollowDirectoryAfterRename(): void
+    {
+        $dir = sys_get_temp_dir() . '/zeromcp-cred-' . getmypid();
+        @mkdir("$dir/math", 0777, true);
+        file_put_contents("$dir/math/add.php", "<?php return ['execute' => fn(\$a, \$c) => \$c->credentials];");
+        putenv('ZEROMCP_TEST_MATH_CRED=mathkey');
+
+        $server = new Server(new Config([
+            'tools' => $dir,
+            'namespacing' => ['math' => ['prefix' => 'm']],
+            'credentials' => ['math' => ['env' => 'ZEROMCP_TEST_MATH_CRED']],
+        ]));
+        $server->loadTools();
+        $resp = $server->handleRequest([
+            'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call',
+            'params' => ['name' => 'm_add', 'arguments' => []],
+        ]);
+        $this->assert(($resp['result']['content'][0]['text'] ?? null) === 'mathkey', 'credentials keyed by directory reach a renamed tool (m_add)');
+
+        putenv('ZEROMCP_TEST_MATH_CRED');
+        @unlink("$dir/math/add.php");
+        @rmdir("$dir/math");
+        @rmdir($dir);
+    }
+
+    private function testAutoloadTools(): void
+    {
+        $base = sys_get_temp_dir() . '/zeromcp-autoload-' . getmypid();
+        @mkdir("$base/tools", 0777, true);
+        file_put_contents("$base/tools/first.php", "<?php return ['description' => 'first', 'execute' => fn(\$a, \$c) => 'one'];");
+        file_put_contents("$base/config.json", json_encode(['tools' => "$base/tools", 'autoload_tools' => true]));
+
+        $proc = proc_open(
+            [PHP_BINARY, __DIR__ . '/../zeromcp.php', 'serve', '--config', "$base/config.json"],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', "$base/stderr.log", 'w']],
+            $pipes
+        );
+        stream_set_blocking($pipes[1], false);
+
+        $buf = '';
+        $readUntil = function (string $needle, float $timeout) use ($pipes, &$buf): ?string {
+            $deadline = microtime(true) + $timeout;
+            while (true) {
+                while (($pos = strpos($buf, "\n")) !== false) {
+                    $line = substr($buf, 0, $pos);
+                    $buf = substr($buf, $pos + 1);
+                    if (str_contains($line, $needle)) return $line;
+                }
+                if (microtime(true) >= $deadline) return null;
+                $r = [$pipes[1]]; $w = null; $e = null;
+                if (@stream_select($r, $w, $e, 0, 200000) > 0) {
+                    $chunk = fread($pipes[1], 65536);
+                    if ($chunk === '' || $chunk === false) {
+                        if (feof($pipes[1])) return null;
+                        continue;
+                    }
+                    $buf .= $chunk;
+                }
+            }
+        };
+
+        // Wait until the server is up (it answers ping) before changing files.
+        fwrite($pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']) . "\n");
+        fflush($pipes[0]);
+        $pong = $readUntil('"id":1', 5);
+        $this->assert($pong !== null, 'autoload server answers over stdio');
+
+        file_put_contents("$base/tools/second.php", "<?php return ['description' => 'second', 'execute' => fn(\$a, \$c) => 'two'];");
+        $note = $readUntil('notifications/tools/list_changed', 5);
+        $this->assert($note === '{"jsonrpc":"2.0","method":"notifications/tools/list_changed","params":{}}', 'list_changed notification sent after a new tool file appears');
+
+        fwrite($pipes[0], json_encode(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list']) . "\n");
+        fflush($pipes[0]);
+        $line = $readUntil('"id":2', 5);
+        $names = $line ? array_column(json_decode($line, true)['result']['tools'] ?? [], 'name') : [];
+        sort($names);
+        $this->assert($names === ['first', 'second'], 'tools/list includes the new tool after reload');
+
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        proc_terminate($proc);
+        proc_close($proc);
+
+        $stderr = (string) @file_get_contents("$base/stderr.log");
+        $this->assert(str_contains($stderr, '[zeromcp] autoload_tools enabled — watching for changes'), 'autoload startup line logged');
+        $this->assert(str_contains($stderr, '[zeromcp] Change detected: second.php'), 'change detected line logged');
+
+        foreach (['tools/first.php', 'tools/second.php', 'config.json', 'stderr.log'] as $f) @unlink("$base/$f");
+        @rmdir("$base/tools");
+        @rmdir($base);
     }
 }
 

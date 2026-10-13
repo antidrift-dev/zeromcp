@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/../src/Log.php';
 require_once __DIR__ . '/../src/Config.php';
 
 use ZeroMcp\Config;
@@ -23,6 +24,12 @@ class ConfigTest
         $this->testBypassPermissions();
         $this->testCredentials();
         $this->testLoadMissingFile();
+        $this->testToolSourcesWithPrefix();
+        $this->testNamespacingDefault();
+        $this->testResourcePromptObjectEntries();
+        $this->testRemoteAndAutoloadDefaults();
+        $this->testHttpTransportRejected();
+        $this->testStdioTransportAccepted();
 
         echo "\n{$this->passed} passed, {$this->failed} failed\n";
         if ($this->failed > 0) exit(1);
@@ -121,6 +128,79 @@ class ConfigTest
     {
         $config = Config::load('/nonexistent/path/zeromcp.config.json');
         $this->assert($config->toolsDirs === ['./tools'], 'load missing file returns defaults');
+    }
+
+    private function testToolSourcesWithPrefix(): void
+    {
+        $config = new Config(['tools' => ['./a', ['path' => './b', 'prefix' => 'x']]]);
+        $this->assert($config->toolSources === [
+            ['path' => './a', 'prefix' => null],
+            ['path' => './b', 'prefix' => 'x'],
+        ], 'mixed tool sources normalized to {path, prefix}');
+        $this->assert($config->toolsDirs === ['./a', './b'], 'toolsDirs is the list of source paths');
+
+        $default = new Config();
+        $this->assert($default->toolSources === [['path' => './tools', 'prefix' => null]], 'default tool source');
+    }
+
+    private function testNamespacingDefault(): void
+    {
+        $this->assert((new Config())->namespacing === [], 'namespacing defaults to []');
+        $ns = ['math' => ['prefix' => 'm']];
+        $this->assert((new Config(['namespacing' => $ns]))->namespacing === $ns, 'namespacing preserved');
+    }
+
+    private function testResourcePromptObjectEntries(): void
+    {
+        $config = new Config([
+            'resources' => ['/r1', ['path' => '/r2', 'prefix' => 'ignored']],
+            'prompts' => [['path' => '/p1']],
+        ]);
+        $this->assert($config->resourcesDirs === ['/r1', '/r2'], 'resource object entries reduce to paths');
+        $this->assert($config->promptsDirs === ['/p1'], 'prompt object entries reduce to paths');
+    }
+
+    private function testRemoteAndAutoloadDefaults(): void
+    {
+        $config = new Config();
+        $this->assert($config->remote === [], 'remote defaults to []');
+        $this->assert($config->autoloadTools === false, 'autoload_tools defaults to false');
+
+        $remote = [['name' => 'probeo', 'url' => 'http://x', 'tools' => ['a']]];
+        $config2 = new Config(['remote' => $remote, 'autoload_tools' => true]);
+        $this->assert($config2->remote === $remote, 'remote preserved');
+        $this->assert($config2->autoloadTools === true, 'autoload_tools enabled');
+    }
+
+    private function testHttpTransportRejected(): void
+    {
+        $threw = null;
+        try {
+            new Config(['transport' => [['type' => 'http', 'port' => 1]]]);
+        } catch (\InvalidArgumentException $e) {
+            $threw = $e;
+        }
+        $this->assert($threw !== null, 'http transport throws InvalidArgumentException');
+        $this->assert($threw !== null && str_contains($threw->getMessage(), 'Registry::create'), 'error names Registry::create');
+
+        $threwSingle = false;
+        try {
+            new Config(['transport' => ['type' => 'http', 'port' => 1]]);
+        } catch (\InvalidArgumentException $e) {
+            $threwSingle = true;
+        }
+        $this->assert($threwSingle, 'single http transport object also throws');
+    }
+
+    private function testStdioTransportAccepted(): void
+    {
+        $ok = true;
+        try {
+            new Config(['transport' => [['type' => 'stdio']]]);
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
+        $this->assert($ok, 'stdio transport is accepted');
     }
 }
 

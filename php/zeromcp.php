@@ -9,6 +9,7 @@ require_once __DIR__ . '/src/Resource.php';
 require_once __DIR__ . '/src/Prompt.php';
 require_once __DIR__ . '/src/Sandbox.php';
 require_once __DIR__ . '/src/Scanner.php';
+require_once __DIR__ . '/src/RemoteManager.php';
 require_once __DIR__ . '/src/Server.php';
 
 // Parse --config flag from argv
@@ -26,24 +27,31 @@ for ($i = 1; $i < count($argv); $i++) {
 $command = $filteredArgs[0] ?? null;
 $toolsDir = $filteredArgs[1] ?? null;
 
-if ($command !== 'serve' && $command !== 'http') {
-    fwrite(STDERR, "Usage: zeromcp serve|http [tools-directory] [--config <path>]\n");
+if ($command === 'http') {
+    // ZeroMCP no longer ships an HTTP server.
+    ZeroMcp\Log::write(ZeroMcp\Config::HTTP_TRANSPORT_REMOVED . "\n");
     exit(1);
 }
 
-if ($configPath) {
-    $data = json_decode(file_get_contents($configPath), true);
-    $config = new ZeroMcp\Config($data ?? []);
-} else {
-    $config = ZeroMcp\Config::load();
-    if ($toolsDir) {
-        $config = new ZeroMcp\Config(['tools' => $toolsDir]);
+if ($command !== 'serve') {
+    ZeroMcp\Log::write("Usage: zeromcp serve [tools-directory] [--config <path>]\n");
+    exit(1);
+}
+
+try {
+    if ($configPath) {
+        $data = json_decode(file_get_contents($configPath), true);
+        $config = new ZeroMcp\Config($data ?? []);
+    } else {
+        $config = ZeroMcp\Config::load();
+        if ($toolsDir) {
+            $config = new ZeroMcp\Config(['tools' => $toolsDir]);
+        }
     }
+} catch (\InvalidArgumentException $e) {
+    ZeroMcp\Log::write($e->getMessage() . "\n");
+    exit(1);
 }
 
 $server = new ZeroMcp\Server($config);
-if ($command === 'http') {
-    $server->serveHttp();
-} else {
-    $server->serve();
-}
+$server->serve();

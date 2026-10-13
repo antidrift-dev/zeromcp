@@ -22,6 +22,8 @@ class Server
     private array $credentialCache = [];
     /** Overrides resolveCredentials() when set — used by Registry::create()'s get_env option. */
     private ?\Closure $envOverride = null;
+    /** Per-call runtime context provider (`get_runtime` option); its value lands on $ctx->runtime. */
+    private ?\Closure $getRuntime = null;
 
     private const ICON_MIME = [
         'png'  => 'image/png',
@@ -33,10 +35,14 @@ class Server
         'webp' => 'image/webp',
     ];
 
-    public function __construct(?Config $config = null)
+    /** @param array{get_runtime?: callable(): mixed} $options */
+    public function __construct(?Config $config = null, array $options = [])
     {
         $this->config = $config ?? Config::load();
         $this->scanner = new Scanner($this->config);
+        if (isset($options['get_runtime'])) {
+            $this->getRuntime = \Closure::fromCallable($options['get_runtime']);
+        }
     }
 
     /**
@@ -57,12 +63,40 @@ class Server
     }
 
     /**
-     * Load tools, resources, and prompts from the configured directories.
-     * Call this before using handleRequest() directly (serve() calls this automatically).
+     * Load tools (remote first, then local), resources, and prompts from the configured
+     * directories. Call this before using handleRequest() directly (serve() calls this
+     * automatically). A local scan failure propagates.
      */
     public function loadTools(): void
     {
-        $this->tools = $this->scanner->scan();
+        $this->loadToolsInternal(false);
+    }
+
+    /**
+     * @param bool $tolerateScanFailure serve() path: a failed local scan is tolerated when
+     *   remote servers, resources or prompts are configured, and exits 1 otherwise.
+     */
+    private function loadToolsInternal(bool $tolerateScanFailure): void
+    {
+        $this->tools = [];
+        if (!empty($this->config->remote)) {
+            $this->tools = (new RemoteManager())->connect($this->config->remote);
+        }
+
+        try {
+            foreach ($this->scanner->scan() as $name => $tool) {
+                if (isset($this->tools[$name])) {
+                    Log::write("[zeromcp] Local tool \"$name\" overrides remote\n");
+                }
+                $this->tools[$name] = $tool;
+            }
+        } catch (\Throwable $e) {
+            if (!$tolerateScanFailure) throw $e;
+            if (empty($this->config->remote) && empty($this->config->resourcesDirs) && empty($this->config->promptsDirs)) {
+                Log::write("[zeromcp] No tools directory and no remote servers configured\n");
+                exit(1);
+            }
+        }
         Log::write("[zeromcp] " . count($this->tools) . " tool(s) loaded\n");
 
         $result = $this->scanner->scanResources();
@@ -74,88 +108,6 @@ class Server
         Log::write("[zeromcp] " . count($this->prompts) . " prompt(s) loaded\n");
 
         $this->icon = $this->resolveIcon($this->config->icon);
-    }
-
-    /**
-     * Start an HTTP server that handles both /mcp (JSON-RPC over HTTP) and
-     * any tool routes defined via the `route` field (method + path).
-     *
-     * This uses PHP's built-in single-request CGI/SAPI model: one request per
-     * process invocation. When running under php -S (built-in web server) or
-     * a traditional web server (Apache/nginx + PHP-FPM), each request is
-     * handled by this method.
-     */
-    public function serveHttp(): void
-    {
-        $this->loadTools();
-        Log::write("[zeromcp] HTTP transport ready\n");
-
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
-
-        // /mcp — JSON-RPC endpoint
-        if ($path === '/mcp') {
-            $body    = file_get_contents('php://input');
-            $request = json_decode($body, true);
-            if (!is_array($request)) {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                echo json_encode(['error' => 'Invalid JSON-RPC request']);
-                return;
-            }
-            $response = $this->handleRequest($request);
-            header('Content-Type: application/json');
-            echo json_encode($response, JSON_UNESCAPED_SLASHES);
-            return;
-        }
-
-        // Tool routes
-        foreach ($this->tools as $tool) {
-            if ($tool->route === null) continue;
-            $routeMethod = strtoupper($tool->route['method'] ?? '');
-            $routePath   = $tool->route['path'] ?? '';
-            if ($routeMethod !== strtoupper($method)) continue;
-            $pathParams = self::matchRoutePath($routePath, $path);
-            if ($pathParams === null) continue;
-
-            // Build args: path params + query/body params
-            if ($method === 'GET') {
-                $args = array_merge($_GET, $pathParams);
-            } else {
-                $body = file_get_contents('php://input');
-                $bodyArgs = json_decode($body, true) ?? [];
-                $args = array_merge($bodyArgs, $pathParams);
-            }
-
-            try {
-                $result = $tool->call($args);
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => true, 'result' => $result], JSON_UNESCAPED_SLASHES);
-            } catch (\Throwable $e) {
-                http_response_code(500);
-                header('Content-Type: application/json');
-                echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
-            }
-            return;
-        }
-
-        // GET /openapi.json
-        if ($method === 'GET' && $path === '/openapi.json') {
-            header('Content-Type: application/json');
-            echo json_encode($this->buildOpenApiSpec(), JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-            return;
-        }
-
-        // GET /docs — Swagger UI
-        if ($method === 'GET' && $path === '/docs') {
-            header('Content-Type: text/html; charset=utf-8');
-            echo $this->buildSwaggerHtml();
-            return;
-        }
-
-        http_response_code(404);
-        header('Content-Type: application/json');
-        echo json_encode(['error' => 'Not found']);
     }
 
     public function buildOpenApiSpec(): array
@@ -250,48 +202,144 @@ class Server
         ];
     }
 
-    private function buildSwaggerHtml(): string
-    {
-        return <<<'HTML'
-<!DOCTYPE html>
-<html>
-<head>
-  <title>ZeroMCP API</title>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
-<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-</body>
-</html>
-HTML;
-    }
-
     public function serve(): void
     {
-        $this->loadTools();
+        $this->loadToolsInternal(true);
+
+        if ($this->config->autoloadTools) {
+            Log::write("[zeromcp] autoload_tools enabled — watching for changes\n");
+            Log::write("[zeromcp] stdio transport ready\n");
+            $this->serveWithAutoload();
+            return;
+        }
+
         Log::write("[zeromcp] stdio transport ready\n");
 
         $stdin = fopen('php://stdin', 'r');
 
         while (($line = fgets($stdin)) !== false) {
-            $line = trim($line);
-            if ($line === '') continue;
+            $this->handleLine($line);
+        }
 
-            $request = json_decode($line, true);
-            if (!is_array($request)) continue;
+        fclose($stdin);
+    }
 
-            $response = $this->handleRequest($request);
-            if ($response !== null) {
-                fwrite(STDOUT, json_encode($response, JSON_UNESCAPED_SLASHES) . "\n");
-                fflush(STDOUT);
+    private function handleLine(string $line): void
+    {
+        $line = trim($line);
+        if ($line === '') return;
+
+        $request = json_decode($line, true);
+        if (!is_array($request)) return;
+
+        $response = $this->handleRequest($request);
+        if ($response !== null) {
+            fwrite(STDOUT, json_encode($response, JSON_UNESCAPED_SLASHES) . "\n");
+            fflush(STDOUT);
+        }
+    }
+
+    /**
+     * stdio loop for autoload_tools: stream_select with a 1s timeout so the tool
+     * directories can be polled between requests. Stock PHP has no recursive
+     * filesystem watcher, so changes are found by comparing mtime/size fingerprints.
+     */
+    private function serveWithAutoload(): void
+    {
+        $stdin = fopen('php://stdin', 'r');
+        stream_set_blocking($stdin, false);
+        $buffer = '';
+        $fingerprint = $this->toolFingerprint();
+        $lastCheck = microtime(true);
+
+        while (true) {
+            $read = [$stdin];
+            $write = null;
+            $except = null;
+            $ready = @stream_select($read, $write, $except, 1);
+
+            if ($ready > 0) {
+                $chunk = fread($stdin, 65536);
+                if ($chunk === false || ($chunk === '' && feof($stdin))) {
+                    if ($buffer !== '') $this->handleLine($buffer);
+                    break;
+                }
+                $buffer .= $chunk;
+                while (($pos = strpos($buffer, "\n")) !== false) {
+                    $line = substr($buffer, 0, $pos);
+                    $buffer = substr($buffer, $pos + 1);
+                    $this->handleLine($line);
+                }
+            }
+
+            if (microtime(true) - $lastCheck >= 1.0) {
+                $lastCheck = microtime(true);
+                $current = $this->toolFingerprint();
+                if ($current !== $fingerprint) {
+                    $this->reloadTools($fingerprint, $current);
+                    $fingerprint = $current;
+                }
             }
         }
 
         fclose($stdin);
+    }
+
+    /**
+     * @param array<string, string> $before
+     * @param array<string, string> $after
+     */
+    private function reloadTools(array $before, array $after): void
+    {
+        $changed = [];
+        foreach ($after as $file => $sig) {
+            if (($before[$file] ?? null) !== $sig) $changed[] = $file;
+        }
+        foreach ($before as $file => $_) {
+            if (!isset($after[$file])) $changed[] = $file;
+        }
+        foreach ($changed as $file) {
+            Log::write("[zeromcp] Change detected: $file\n");
+        }
+
+        // Merge, not replace: tools whose files disappeared stay registered (as in Node).
+        foreach ($this->scanner->scan() as $name => $tool) {
+            $this->tools[$name] = $tool;
+        }
+
+        fwrite(STDOUT, json_encode([
+            'jsonrpc' => '2.0',
+            'method' => 'notifications/tools/list_changed',
+            'params' => new \stdClass(),
+        ], JSON_UNESCAPED_SLASHES) . "\n");
+        fflush(STDOUT);
+    }
+
+    /**
+     * mtime/size of every *.php file under each tool source, keyed by path relative
+     * to its source directory.
+     *
+     * @return array<string, string>
+     */
+    private function toolFingerprint(): array
+    {
+        clearstatcache();
+        $prints = [];
+        foreach ($this->config->toolSources as $source) {
+            $dir = realpath($source['path']);
+            if ($dir === false || !is_dir($dir)) continue;
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if (!$file->isFile() || $file->getExtension() !== 'php') continue;
+                $path = $file->getPathname();
+                $rel = ltrim(substr($path, strlen($dir)), '/');
+                $prints[$rel] = $file->getMTime() . ':' . $file->getSize();
+            }
+        }
+        ksort($prints);
+        return $prints;
     }
 
     /**
@@ -591,9 +639,13 @@ HTML;
         }
 
         try {
-            $creds = $this->resolveCredentials($name);
+            $creds = $this->resolveCredentials($name, $tool);
             $ctx = new Context($name, $creds, $tool->permissions);
             $ctx->bypass = $this->config->bypassPermissions;
+            if ($this->getRuntime !== null) {
+                $runtime = ($this->getRuntime)();
+                if ($runtime !== null) $ctx->runtime = $runtime;
+            }
 
             // Tool-level timeout overrides config default
             $timeoutSecs = $tool->permissions['execute_timeout'] ?? $this->config->executeTimeout;
@@ -639,12 +691,17 @@ HTML;
         }
     }
 
-    private function resolveCredentials(string $toolName): mixed
+    private function resolveCredentials(string $toolName, ?Tool $tool = null): mixed
     {
         if ($this->envOverride !== null) {
             return ($this->envOverride)();
         }
         if (empty($this->config->credentials)) return null;
+        // Scanned tools: credentials are keyed by the tool's first directory segment.
+        if ($tool !== null && $tool->credentialNs !== null) {
+            $source = $this->config->credentials[$tool->credentialNs] ?? null;
+            return is_array($source) ? $this->resolveCredentialsForNs($tool->credentialNs, $source) : null;
+        }
         foreach ($this->config->credentials as $ns => $source) {
             $sep = $this->config->separator;
             if (str_starts_with($toolName, "{$ns}_") || str_starts_with($toolName, "{$ns}{$sep}")) {
@@ -687,33 +744,6 @@ HTML;
     }
 
     // --- Utilities ---
-
-    /**
-     * Match an incoming path against a route pattern with :param segments.
-     * Returns an associative array of extracted params, or null if no match.
-     *
-     * Example: matchRoutePath('/:domain/leads', '/acme/leads') => ['domain' => 'acme']
-     *
-     * @return array<string,string>|null
-     */
-    private static function matchRoutePath(string $pattern, string $path): ?array
-    {
-        $regex = preg_replace_callback('/:([a-zA-Z_][a-zA-Z0-9_]*)/', function ($m) {
-            return '(?P<' . $m[1] . '>[^/]+)';
-        }, preg_quote($pattern, '/'));
-
-        if (!preg_match('/^' . $regex . '$/', $path, $matches)) {
-            return null;
-        }
-
-        $params = [];
-        foreach ($matches as $key => $value) {
-            if (is_string($key)) {
-                $params[$key] = $value;
-            }
-        }
-        return $params;
-    }
 
     /**
      * Base64 cursor-based pagination. pageSize 0 = no pagination.
