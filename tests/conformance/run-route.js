@@ -32,7 +32,7 @@ const implementations = [
   {
     name: 'Ruby',
     command: 'ruby',
-    args: ['-I', join(root, 'ruby/lib'), join(root, 'ruby/bin/zeromcp'), 'serve', '--config', join(__dirname, 'route-config-ruby.json')],
+    args: ['-I', join(root, 'ruby/lib'), join(__dirname, 'harness/ruby/route-harness.rb'), '14252'],
     env: {},
     port: 14252,
   },
