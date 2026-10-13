@@ -2,6 +2,8 @@
 
 Drop a tool file, get a sandboxed MCP server. Stdio out of the box, 10 languages, zero setup.
 
+**[Docs](docs/README.md)** · [Getting started](docs/getting-started.md) · [Comparisons](docs/comparisons/README.md) · [Benchmarks](https://github.com/antidrift-dev/zeromcp-benchmarks)
+
 ## Why ZeroMCP?
 
 ### Drop a tool and go
