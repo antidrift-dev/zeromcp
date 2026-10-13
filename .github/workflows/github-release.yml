@@ -1,0 +1,83 @@
+name: GitHub Release pages
+
+# On every version tag: create the monorepo Release page from
+# docs/releases/<version>.md, push each language's subtree and tag to its
+# zeromcp-<lang> repo, and create a Release page there that links back.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.4.0). Required when running manually — github.ref_name is "main" on manual dispatch, not the release tag.'
+        required: true
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      ORG: antidrift-dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Find release notes
+        run: |
+          NOTES="docs/releases/${TAG#v}.md"
+          if [ ! -f "$NOTES" ]; then
+            echo "::error::Missing release notes: $NOTES"
+            exit 1
+          fi
+          echo "NOTES=$NOTES" >> "$GITHUB_ENV"
+
+      - name: Monorepo Release page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" -R "$ORG/zeromcp" >/dev/null 2>&1; then
+            gh release edit "$TAG" -R "$ORG/zeromcp" --title "$TAG" --notes-file "$NOTES"
+          else
+            gh release create "$TAG" -R "$ORG/zeromcp" --verify-tag --title "$TAG" --notes-file "$NOTES"
+          fi
+
+      - name: Subtree pushes and Release pages
+        env:
+          GH_TOKEN: ${{ secrets.PAT_SUBTREE }}
+        run: |
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.PAT_SUBTREE }}@github.com" > ~/.git-credentials
+
+          # dir:repo:display name
+          for entry in nodejs:node:Node.js python:python:Python go:go:Go rust:rust:Rust \
+                       java:java:Java kotlin:kotlin:Kotlin swift:swift:Swift csharp:csharp:C# \
+                       ruby:ruby:Ruby php:php:PHP; do
+            dir="${entry%%:*}"; rest="${entry#*:}"; repo="zeromcp-${rest%%:*}"; name="${rest#*:}"
+
+            SHA=$(git subtree split --prefix="$dir" HEAD)
+            git push "https://github.com/$ORG/$repo.git" "$SHA:refs/heads/main" --force
+            git push "https://github.com/$ORG/$repo.git" "$SHA:refs/tags/$TAG" --force
+
+            # The language's own section of the notes ("## <name>" up to the
+            # next "## "), if the notes have one.
+            section=$(awk -v h="## $name" '$0==h {on=1; next} on && /^## / {exit} on {print}' "$NOTES")
+            {
+              echo "ZeroMCP $TAG for $name."
+              echo
+              if [ -n "$section" ]; then echo "$section"; echo; fi
+              echo "Full release notes: https://github.com/$ORG/zeromcp/releases/tag/$TAG"
+            } > /tmp/body.md
+
+            if gh release view "$TAG" -R "$ORG/$repo" >/dev/null 2>&1; then
+              gh release edit "$TAG" -R "$ORG/$repo" --title "$TAG" --notes-file /tmp/body.md
+            else
+              gh release create "$TAG" -R "$ORG/$repo" --verify-tag --title "$TAG" --notes-file /tmp/body.md
+            fi
+            echo "✓ $repo $TAG"
+          done
