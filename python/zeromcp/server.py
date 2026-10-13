@@ -124,6 +124,14 @@ async def serve(config_or_path: dict | str | None = None) -> None:
     else:
         config = config_or_path or {}
 
+    transports = resolve_transports(config)
+    if any(t.get("type") == "http" for t in transports):
+        _log(
+            "The built-in HTTP transport was removed. Mount zeromcp.create_registry "
+            "(routes, OpenAPI, MCP handler) or zeromcp.create_handler in your own HTTP server."
+        )
+        sys.exit(1)
+
     state = await _build_state(config, exit_without_sources=True)
 
     # Hot reload
@@ -140,16 +148,10 @@ async def serve(config_or_path: dict | str | None = None) -> None:
         _log("autoload_tools enabled — watching for changes")
 
     # Start transports
-    transports = resolve_transports(config)
-
     tasks = []
     for t in transports:
         if t["type"] == "stdio":
             tasks.append(_start_stdio(state))
-        elif t["type"] == "http":
-            port = t.get("port", 8080)
-            host = t.get("host", "127.0.0.1")
-            tasks.append(_start_http(state, host, port))
 
     try:
         if len(tasks) == 1:
@@ -533,49 +535,6 @@ async def _call_tool(tools: dict, params: dict, execute_timeout: float = 30) -> 
         }
 
 
-def _match_route_path(pattern: str, pathname: str) -> dict[str, str] | None:
-    """Match a URL pathname against a route pattern with :param segments."""
-    # Split on :param tokens, escape static segments, replace params with named groups
-    parts = re.split(r"(:\w+)", pattern)
-    regex_parts = []
-    for part in parts:
-        if re.match(r":\w+", part):
-            param_name = part[1:]
-            regex_parts.append(f"(?P<{param_name}>[^/]+)")
-        else:
-            regex_parts.append(re.escape(part))
-    regex = "".join(regex_parts)
-    m = re.fullmatch(regex, pathname)
-    return dict(m.groupdict()) if m else None
-
-
-async def _handle_http_route(tool: dict, path_params: dict, method: str, body: bytes, query_string: str) -> tuple[int, dict]:
-    """Dispatch an HTTP request to a tool and return (status, response_dict)."""
-    import urllib.parse
-    args: dict = dict(path_params)
-    if method == "GET":
-        qs = urllib.parse.parse_qs(query_string, keep_blank_values=True)
-        for k, v in qs.items():
-            args[k] = v[0] if len(v) == 1 else v
-    else:
-        if body:
-            try:
-                body_data = json.loads(body)
-                if isinstance(body_data, dict):
-                    args.update(body_data)
-            except (json.JSONDecodeError, ValueError):
-                pass
-    try:
-        result = await asyncio.wait_for(tool["execute"](args), timeout=30)
-        if isinstance(result, str):
-            payload = result
-        else:
-            payload = json.dumps(result, default=str)
-        return 200, {"ok": True, "result": payload}
-    except Exception as exc:
-        return 500, {"ok": False, "error": str(exc)}
-
-
 def build_openapi(state: dict) -> dict:
     """Build an OpenAPI 3.0 spec from tools that have a route field."""
     title = state.get("title", "ZeroMCP")
@@ -637,135 +596,6 @@ def build_openapi(state: dict) -> dict:
         "info": {"title": title, "version": state.get("version", "0.5.0")},
         "paths": paths,
     }
-
-
-_DOCS_HTML = """<!DOCTYPE html>
-<html>
-<head>
-  <title>ZeroMCP API</title>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
-<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-</body>
-</html>"""
-
-
-async def _start_http(state: dict, host: str, port: int) -> None:
-    """Start a minimal HTTP server that handles /mcp (JSON-RPC) and tool routes."""
-    import urllib.parse
-
-    _log(f"http transport ready on {host}:{port}")
-
-    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        try:
-            raw = await reader.read(65536)
-        except Exception:
-            writer.close()
-            return
-
-        try:
-            header_part, _, body = raw.partition(b"\r\n\r\n")
-            header_lines = header_part.decode("utf-8", errors="replace").splitlines()
-            if not header_lines:
-                writer.close()
-                return
-            request_line = header_lines[0]
-            parts = request_line.split(" ")
-            if len(parts) < 2:
-                writer.close()
-                return
-            req_method = parts[0].upper()
-            raw_path = parts[1]
-            parsed = urllib.parse.urlparse(raw_path)
-            pathname = parsed.path
-            query_string = parsed.query
-
-            content_length = 0
-            for h in header_lines[1:]:
-                if h.lower().startswith("content-length:"):
-                    try:
-                        content_length = int(h.split(":", 1)[1].strip())
-                    except ValueError:
-                        pass
-
-            body = body[:content_length] if content_length else body
-
-            # /openapi.json — OpenAPI spec
-            if pathname == "/openapi.json" and req_method == "GET":
-                spec = build_openapi(state)
-                _http_respond(writer, 200, spec)
-                return
-
-            # /docs — Swagger UI
-            if pathname == "/docs" and req_method == "GET":
-                html = _DOCS_HTML.encode("utf-8")
-                response = (
-                    "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: text/html; charset=utf-8\r\n"
-                    f"Content-Length: {len(html)}\r\n"
-                    "Connection: close\r\n"
-                    "\r\n"
-                ).encode("utf-8") + html
-                writer.write(response)
-                return
-
-            # /mcp — JSON-RPC handler
-            if pathname == "/mcp" and req_method == "POST":
-                try:
-                    request = json.loads(body)
-                except (json.JSONDecodeError, ValueError):
-                    _http_respond(writer, 400, {"error": "invalid JSON"})
-                    return
-                response = await handle_request(request, state)
-                _http_respond(writer, 200, response)
-                return
-
-            # Route-based tool dispatch
-            tools = state["tools"]
-            for tool in tools.values():
-                route = tool.get("route")
-                if not route:
-                    continue
-                if route["method"] != req_method:
-                    continue
-                path_params = _match_route_path(route["path"], pathname)
-                if path_params is None:
-                    continue
-                status, resp = await _handle_http_route(tool, path_params, req_method, body, query_string)
-                _http_respond(writer, status, resp)
-                return
-
-            _http_respond(writer, 404, {"error": "not found"})
-        except Exception as exc:
-            _http_respond(writer, 500, {"error": str(exc)})
-        finally:
-            try:
-                writer.close()
-            except Exception:
-                pass
-
-    server = await asyncio.start_server(handle, host, port)
-    async with server:
-        await server.serve_forever()
-
-
-def _http_respond(writer: asyncio.StreamWriter, status: int, body: object) -> None:
-    """Write a minimal HTTP/1.1 JSON response."""
-    status_text = {200: "OK", 400: "Bad Request", 404: "Not Found", 500: "Internal Server Error"}.get(status, "OK")
-    payload = json.dumps(body).encode("utf-8")
-    response = (
-        f"HTTP/1.1 {status} {status_text}\r\n"
-        f"Content-Type: application/json\r\n"
-        f"Content-Length: {len(payload)}\r\n"
-        f"Connection: close\r\n"
-        f"\r\n"
-    ).encode("utf-8") + payload
-    writer.write(response)
 
 
 def _log(msg: str) -> None:
