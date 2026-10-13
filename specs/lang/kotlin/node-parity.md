@@ -2,7 +2,7 @@
 
 ## Status
 
-Not started. Spec only.
+Done (2026-10-13). Docker `gradle test`: 93 tests, 0 failures (new RemoteTest 10, plus runtime/icon/page_size cases in ServerTest, RegistryTest, ConfigTest); Kotlin conformance unchanged, all suites pass.
 
 ## Gaps
 

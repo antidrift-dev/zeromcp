@@ -64,10 +64,15 @@ enum class FsPermission {
 
 /**
  * Context passed to tool execution.
+ *
+ * [runtime] is whatever [ZeroMcp.runtimeProvider] returned for this call
+ * (null when no provider is set, and always null for remote tools). Cast it
+ * to your own type: `ctx.runtime as MyRuntime`.
  */
 data class Ctx(
     val toolName: String,
-    val permissions: Permissions = Permissions()
+    val permissions: Permissions = Permissions(),
+    val runtime: Any? = null
 )
 
 /**

@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Kotlin
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker `gradle test`: 93 tests, 0 failures (OpenApiSpecTest folded into RegistryTest, transport-error cases in ConfigTest); route conformance via the RouteTest registry harness: Kotlin 5/5 (was skipped).
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `ZeroMcp.registry()` (routes, OpenAPI, MCP handler as plain data, `Server.kt:69-81`) and `ZeroMcp.handleRequest` (`Server.kt:270`) already cover that. `serveHttp` is the one piece that runs an HTTP server inside the library.

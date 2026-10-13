@@ -29,6 +29,10 @@ fun main() {
         resourceTestMain()
         return
     }
+    if (System.getenv("ZEROMCP_ROUTE_TEST") == "true") {
+        routeTestMain()
+        return
+    }
 
     val server = ZeroMcp()
 
