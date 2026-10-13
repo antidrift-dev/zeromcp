@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Java
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: `mvn test` 108/108 (incl. http-transport startup error); route suite Java 5/5 via the rewritten `RouteTest` registry harness (was 3/5); other Java conformance suites unchanged; grep for httpserver/serveHttp/port() in `java/src/main` is empty.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `ZeroMcp.registry()` (routes, OpenAPI, MCP handler as plain data) and `ZeroMcp.handleRequest(JsonObject)` already cover that. `serveHttp` is the one piece that runs ZeroMCP's own listener (JDK `com.sun.net.httpserver.HttpServer`).
