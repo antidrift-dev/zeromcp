@@ -17,6 +17,12 @@ public class RegistryOptions
     /// ZeroMcpServer.CallTool already constructs.
     /// </summary>
     public Func<string, Permissions?, ToolContext>? GetContext { get; set; }
+
+    /// <summary>
+    /// Remote MCP servers to federate as "&lt;name&gt;.&lt;tool&gt;"; a local tool with the same
+    /// name overrides. Requires Registry.CreateAsync.
+    /// </summary>
+    public List<RemoteServer>? Remote { get; set; }
 }
 
 public class ToolRegistry
@@ -32,7 +38,29 @@ public static class Registry
         Dictionary<string, ToolDefinition> tools,
         RegistryOptions? options = null)
     {
+        if (options?.Remote is { Count: > 0 })
+            throw new InvalidOperationException("RegistryOptions.Remote requires Registry.CreateAsync");
+
         var server = new ZeroMcpServer { ContextFactory = options?.GetContext };
+        return Build(server, tools);
+    }
+
+    /// <summary>
+    /// Like Create, but first connects RegistryOptions.Remote. Remote tools are
+    /// dispatched through Mcp only; Routes and OpenApi cover local routed tools.
+    /// </summary>
+    public static async Task<ToolRegistry> CreateAsync(
+        Dictionary<string, ToolDefinition> tools,
+        RegistryOptions? options = null)
+    {
+        var server = new ZeroMcpServer { ContextFactory = options?.GetContext };
+        if (options?.Remote is { Count: > 0 })
+            await server.ConnectRemotes(options.Remote);
+        return Build(server, tools);
+    }
+
+    private static ToolRegistry Build(ZeroMcpServer server, Dictionary<string, ToolDefinition> tools)
+    {
         foreach (var (name, tool) in tools)
         {
             server.Tool(name, tool);

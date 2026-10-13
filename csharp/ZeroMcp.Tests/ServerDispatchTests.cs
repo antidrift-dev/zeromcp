@@ -297,4 +297,129 @@ public class ServerDispatchTests
         Assert.Contains("count", content[0]["text"]);
         Assert.Contains("5", content[0]["text"]);
     }
+
+    // --- Runtime context ---
+
+    private static async Task<string> CallText(ZeroMcpServer server, string name)
+    {
+        var resp = await server.HandleRequest(MakeRequest("tools/call",
+            new Dictionary<string, object> { ["name"] = name }));
+        var result = (Dictionary<string, object>)resp!["result"]!;
+        return ((List<Dictionary<string, string>>)result["content"])[0]["text"];
+    }
+
+    [Fact]
+    public async Task GetRuntime_SetsCtxRuntime()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig()) { GetRuntime = () => "rt" };
+        server.Tool("rt", "Returns runtime", execute: (_, ctx) => Task.FromResult<object>(ctx.Runtime!));
+
+        Assert.Equal("rt", await CallText(server, "rt"));
+    }
+
+    [Fact]
+    public async Task GetRuntime_Unset_RuntimeIsNull()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig());
+        server.Tool("rt", "Returns runtime",
+            execute: (_, ctx) => Task.FromResult<object>(ctx.Runtime == null ? "null" : "set"));
+
+        Assert.Equal("null", await CallText(server, "rt"));
+    }
+
+    [Fact]
+    public async Task GetRuntime_InvokedOncePerCall()
+    {
+        var count = 0;
+        var server = new ZeroMcpServer(new ZeroMcpConfig()) { GetRuntime = () => ++count };
+        server.Tool("rt", "Returns runtime", execute: (_, ctx) => Task.FromResult<object>(ctx.Runtime!));
+
+        Assert.Equal("1", await CallText(server, "rt"));
+        Assert.Equal("2", await CallText(server, "rt"));
+        Assert.Equal(2, count);
+    }
+
+    // --- Config icon ---
+
+    private static async Task<List<Dictionary<string, object>>> ListToolsAfterPrepare(ZeroMcpServer server)
+    {
+        server.Tool("t", "Tool");
+        await server.Prepare();
+        var resp = await server.HandleRequest(MakeRequest("tools/list"));
+        var result = (Dictionary<string, object>)resp!["result"]!;
+        return (List<Dictionary<string, object>>)result["tools"];
+    }
+
+    [Fact]
+    public async Task ConfigIcon_DataUri_PassesThrough()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig { Icon = "data:image/png;base64,AAAA" });
+        var tools = await ListToolsAfterPrepare(server);
+        var icons = (List<Dictionary<string, string>>)tools[0]["icons"];
+        Assert.Equal("data:image/png;base64,AAAA", icons[0]["uri"]);
+    }
+
+    [Fact]
+    public async Task ConfigIcon_SvgFile_BecomesDataUri()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"zeromcp-icon-{Guid.NewGuid():N}.svg");
+        File.WriteAllText(path, "<svg/>");
+        try
+        {
+            var server = new ZeroMcpServer(new ZeroMcpConfig { Icon = path });
+            var tools = await ListToolsAfterPrepare(server);
+            var icons = (List<Dictionary<string, string>>)tools[0]["icons"];
+            Assert.Equal("data:image/svg+xml;base64," + Convert.ToBase64String("<svg/>"u8.ToArray()), icons[0]["uri"]);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task ConfigIcon_MissingFile_NoIcons()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig { Icon = "/nonexistent/zeromcp-icon.png" });
+        var tools = await ListToolsAfterPrepare(server);
+        Assert.False(tools[0].ContainsKey("icons"));
+    }
+
+    [Fact]
+    public async Task CodeIcon_WinsOverConfigIcon()
+    {
+        var server = new ZeroMcpServer(new ZeroMcpConfig { Icon = "data:image/png;base64,CONFIG" })
+        {
+            Icon = "data:image/png;base64,CODE"
+        };
+        var tools = await ListToolsAfterPrepare(server);
+        var icons = (List<Dictionary<string, string>>)tools[0]["icons"];
+        Assert.Equal("data:image/png;base64,CODE", icons[0]["uri"]);
+    }
+
+    // --- Removed HTTP transport ---
+
+    [Fact]
+    public async Task Serve_HttpTransportInConfig_Throws()
+    {
+        var config = new ZeroMcpConfig
+        {
+            Transport = JsonDocument.Parse("[{\"type\":\"http\",\"port\":4242}]").RootElement.Clone()
+        };
+        var server = new ZeroMcpServer(config);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => server.Serve());
+        Assert.Contains("Registry.Create", ex.Message);
+    }
+
+    [Fact]
+    public async Task Serve_HttpTransportObject_Throws()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(path, "{\"transport\":{\"type\":\"http\",\"port\":4242}}");
+            var server = new ZeroMcpServer(ZeroMcpConfig.Load(path));
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => server.Serve());
+            Assert.Contains("HandleRequest", ex.Message);
+        }
+        finally { File.Delete(path); }
+    }
 }
