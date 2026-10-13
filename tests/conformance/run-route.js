@@ -25,7 +25,7 @@ const implementations = [
   {
     name: 'Python',
     command: 'python3',
-    args: ['-m', 'zeromcp', 'serve', '--config', join(__dirname, 'route-config-python.json')],
+    args: [join(__dirname, 'route-harness-python.py')],
     env: { PYTHONPATH: join(root, 'python') },
     port: 14251,
   },
