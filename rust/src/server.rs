@@ -1,14 +1,16 @@
-use crate::config::{load_config, Config};
+use crate::config::{load_config, resolve_icon, Config};
 use crate::schema::validate;
 use crate::sandbox::validate_permissions;
-use crate::types::{BoxFuture, Ctx, Permissions, Prompt, Resource, ResourceTemplate, Tool};
+use crate::types::{
+    BoxFuture, Ctx, Permissions, Prompt, Resource, ResourceTemplate, RuntimeFn, RuntimeValue, Tool,
+};
 use crate::schema::Input;
 use serde_json::{json, Value};
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpListener;
 
 /// The MCP server. Register tools, resources, prompts, then call `serve()`.
 pub struct Server {
@@ -24,42 +26,91 @@ pub struct Server {
     page_size: usize,
     /// Optional icon URI attached to listed items.
     pub icon: Option<String>,
+    /// Names of tools that came from `config.remote`.
+    remote_names: BTreeSet<String>,
+    /// Whether `prepare` has run.
+    prepared: bool,
+    /// Getter for `Ctx::runtime`, set with `set_runtime`.
+    runtime: Option<RuntimeFn>,
 }
 
 impl Server {
     /// Create a new server with default config.
     pub fn new() -> Self {
-        Self {
-            tools: BTreeMap::new(),
-            resources: BTreeMap::new(),
-            templates: BTreeMap::new(),
-            prompts: BTreeMap::new(),
-            subscriptions: BTreeSet::new(),
-            config: Config::default(),
-            log_level: "info".to_string(),
-            page_size: 0,
-            icon: None,
-        }
+        Self::with_config(Config::default())
     }
 
     /// Create a server loading config from `zeromcp.config.json`.
+    ///
+    /// # Panics
+    /// If the config asks for an `http` transport (see `config::load_config`).
     pub fn from_config(path: &str) -> Self {
+        Self::with_config(load_config(path))
+    }
+
+    fn with_config(config: Config) -> Self {
         Self {
             tools: BTreeMap::new(),
             resources: BTreeMap::new(),
             templates: BTreeMap::new(),
             prompts: BTreeMap::new(),
             subscriptions: BTreeSet::new(),
-            config: load_config(path),
+            page_size: config.page_size,
+            config,
             log_level: "info".to_string(),
-            page_size: 0,
             icon: None,
+            remote_names: BTreeSet::new(),
+            prepared: false,
+            runtime: None,
         }
     }
 
     /// Set the page size for paginated list responses. 0 = no pagination.
+    /// Overrides `page_size` from the config file.
     pub fn set_page_size(&mut self, size: usize) {
         self.page_size = size;
+    }
+
+    /// Set a getter called on every local `tools/call`; its value becomes
+    /// `ctx.runtime` (read it with `ctx.runtime_as::<T>()`). Returning `None`
+    /// leaves `ctx.runtime` unset. Remote tools ignore it.
+    pub fn set_runtime<F, T>(&mut self, get: F)
+    where
+        F: Fn() -> Option<T> + Send + Sync + 'static,
+        T: Any + Send + Sync,
+    {
+        self.runtime = Some(Arc::new(move || {
+            get().map(|v| Arc::new(v) as RuntimeValue)
+        }));
+    }
+
+    /// Connect `config.remote` servers and resolve `config.icon`. Idempotent.
+    ///
+    /// `serve` calls this itself. Call it before using `handle_request`
+    /// directly so remote tools and the icon are in place.
+    pub async fn prepare(&mut self) {
+        if self.prepared {
+            return;
+        }
+        self.prepared = true;
+
+        if !self.config.remote.is_empty() {
+            let remote = crate::remote::connect(&self.config.remote).await;
+            for (name, tool) in remote {
+                if self.tools.contains_key(&name) {
+                    eprintln!("[zeromcp] Local tool \"{name}\" overrides remote");
+                    continue;
+                }
+                self.remote_names.insert(name.clone());
+                self.tools.insert(name, Arc::new(tool));
+            }
+        }
+
+        if self.icon.is_none() {
+            if let Some(icon) = self.config.icon.clone() {
+                self.icon = resolve_icon(&icon).await;
+            }
+        }
     }
 
     // ----- Tool registration -----
@@ -69,6 +120,9 @@ impl Server {
         validate_permissions(name, &tool.permissions);
         // Cache the JSON schema at registration time so it isn't rebuilt per request.
         tool.cached_schema = tool.input.to_json_schema();
+        if self.remote_names.remove(name) {
+            eprintln!("[zeromcp] Local tool \"{name}\" overrides remote");
+        }
         self.tools.insert(name.to_string(), Arc::new(tool));
     }
 
@@ -113,8 +167,12 @@ impl Server {
 
     // ----- Transport -----
 
-    /// Start the stdio JSON-RPC transport.
-    pub async fn serve(&self) {
+    /// Start the stdio JSON-RPC transport. Calls `prepare` first.
+    ///
+    /// ZeroMCP does not ship an HTTP server. To serve over HTTP, mount
+    /// `handle_request` or `zeromcp::registry::create_registry` in your own.
+    pub async fn serve(&mut self) {
+        self.prepare().await;
         let tool_count = self.tools.len();
         let resource_count = self.resources.len() + self.templates.len();
         let prompt_count = self.prompts.len();
@@ -160,23 +218,6 @@ impl Server {
                 }
                 let _ = writer.flush().await;
             }
-        }
-    }
-
-    /// Start an HTTP server on the given address (e.g. `"0.0.0.0:3000"`).
-    /// Handles `/health`, `/mcp` (JSON-RPC over HTTP), `/openapi.json`, and `/docs`.
-    pub async fn serve_http(self, addr: &str) {
-        let listener = TcpListener::bind(addr).await
-            .unwrap_or_else(|e| panic!("[zeromcp] Failed to bind {addr}: {e}"));
-        eprintln!("[zeromcp] HTTP server listening on http://{addr}");
-        let this = Arc::new(self);
-        loop {
-            let (stream, _) = match listener.accept().await {
-                Ok(pair) => pair,
-                Err(e) => { eprintln!("[zeromcp] Accept error: {e}"); continue; }
-            };
-            let server = Arc::clone(&this);
-            tokio::spawn(async move { handle_http_conn(server, stream).await });
         }
     }
 
@@ -569,6 +610,12 @@ impl Server {
             permissions: tool.permissions.clone(),
             logging: self.config.logging,
             bypass: self.config.bypass_permissions,
+            // Remote tools ignore ctx; like Node, only local tools get a runtime.
+            runtime: if self.remote_names.contains(name) {
+                None
+            } else {
+                self.runtime.as_ref().and_then(|get| get())
+            },
         };
 
         // Determine timeout: tool-level overrides config default
@@ -735,83 +782,6 @@ impl Server {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP connection handler
-// ---------------------------------------------------------------------------
-
-/// Handle a single HTTP/1.1 connection. Reads the request line, routes to the
-/// correct handler, and writes a minimal HTTP response.
-async fn handle_http_conn(server: Arc<Server>, mut stream: tokio::net::TcpStream) {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    let mut buf = vec![0u8; 65536];
-    let n = match stream.read(&mut buf).await {
-        Ok(0) | Err(_) => return,
-        Ok(n) => n,
-    };
-
-    let raw = match std::str::from_utf8(&buf[..n]) {
-        Ok(s) => s,
-        Err(_) => return,
-    };
-
-    // Parse request line
-    let first_line = raw.lines().next().unwrap_or("");
-    let mut parts = first_line.splitn(3, ' ');
-    let method = parts.next().unwrap_or("").to_uppercase();
-    let path_and_query = parts.next().unwrap_or("/");
-    let path = path_and_query.split('?').next().unwrap_or("/");
-
-    let (status, content_type, body) = match (method.as_str(), path) {
-        ("GET", "/health") => {
-            (200, "application/json", "{\"status\":\"ok\"}".to_string())
-        }
-        ("GET", "/openapi.json") => {
-            let spec = server.build_openapi();
-            (200, "application/json", serde_json::to_string(&spec).unwrap_or_default())
-        }
-        ("GET", "/docs") => {
-            let html = "<!DOCTYPE html>\n<html>\n<head>\n  <title>ZeroMCP API</title>\n  <meta charset=\"utf-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist/swagger-ui.css\">\n</head>\n<body>\n<div id=\"swagger-ui\"></div>\n<script src=\"https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js\"></script>\n<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>\n</body>\n</html>".to_string();
-            (200, "text/html", html)
-        }
-        ("POST", "/mcp") => {
-            // Find the body (after the blank line separating headers from body)
-            let body_start = raw.find("\r\n\r\n")
-                .map(|i| i + 4)
-                .or_else(|| raw.find("\n\n").map(|i| i + 2))
-                .unwrap_or(raw.len());
-            let body_str = &raw[body_start..];
-            match serde_json::from_str::<Value>(body_str) {
-                Ok(req) => {
-                    let resp = server.handle_request(&req).await
-                        .unwrap_or_else(|| json!({"jsonrpc":"2.0","result":{}}));
-                    (200, "application/json", serde_json::to_string(&resp).unwrap_or_default())
-                }
-                Err(e) => {
-                    let err = json!({
-                        "jsonrpc": "2.0",
-                        "error": { "code": -32700, "message": format!("Parse error: {e}") }
-                    });
-                    (400, "application/json", serde_json::to_string(&err).unwrap_or_default())
-                }
-            }
-        }
-        _ => {
-            (404, "application/json", "{\"error\":\"Not found\"}".to_string())
-        }
-    };
-
-    let response = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{body}",
-        status = status,
-        reason = if status == 200 { "OK" } else if status == 400 { "Bad Request" } else { "Not Found" },
-        content_type = content_type,
-        len = body.len(),
-        body = body
-    );
-    let _ = stream.write_all(response.as_bytes()).await;
-}
-
-// ---------------------------------------------------------------------------
 // Pagination — base64 cursor encoding
 // ---------------------------------------------------------------------------
 
@@ -860,7 +830,7 @@ fn decode_cursor(cursor: &str) -> Option<usize> {
 // Minimal base64 encode/decode (no extra crate)
 const B64_CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-fn base64_encode(data: &[u8]) -> String {
+pub(crate) fn base64_encode(data: &[u8]) -> String {
     let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
@@ -1722,5 +1692,104 @@ mod tests {
         let required = body_schema["required"].as_array().unwrap();
         assert!(!required.iter().any(|v| v == "id"), "path param leaked into body required list");
         assert!(required.iter().any(|v| v == "name"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Runtime context
+    // -----------------------------------------------------------------------
+
+    fn runtime_probe_server() -> Server {
+        let mut server = Server::new();
+        server.add_tool("probe", "Report ctx.runtime", Input::new(), |_, ctx| {
+            Box::pin(async move {
+                Ok(match (&ctx.runtime, ctx.runtime_as::<u32>()) {
+                    (None, _) => json!("none"),
+                    (Some(_), Some(n)) => json!(format!("u32:{n}")),
+                    (Some(_), None) => json!("other"),
+                })
+            })
+        });
+        server
+    }
+
+    async fn call_probe(server: &Server) -> String {
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": { "name": "probe", "arguments": {} }
+        })).await.unwrap();
+        resp["result"]["content"][0]["text"].as_str().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn runtime_getter_value_reaches_tool() {
+        let mut server = runtime_probe_server();
+        server.set_runtime(|| Some(42u32));
+        assert_eq!(call_probe(&server).await, "u32:42");
+    }
+
+    #[tokio::test]
+    async fn runtime_none_without_getter() {
+        let server = runtime_probe_server();
+        assert_eq!(call_probe(&server).await, "none");
+    }
+
+    #[tokio::test]
+    async fn runtime_getter_returning_none_leaves_runtime_unset() {
+        let mut server = runtime_probe_server();
+        server.set_runtime(|| None::<u32>);
+        assert_eq!(call_probe(&server).await, "none");
+    }
+
+    #[tokio::test]
+    async fn runtime_getter_called_once_per_call() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&calls);
+        let mut server = runtime_probe_server();
+        server.set_runtime(move || Some(counter.fetch_add(1, Ordering::SeqCst) as u32));
+        assert_eq!(call_probe(&server).await, "u32:0");
+        assert_eq!(call_probe(&server).await, "u32:1");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        // Listing tools does not call the getter.
+        server.handle_request(&json!({ "jsonrpc": "2.0", "id": 9, "method": "tools/list" })).await;
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Config: page_size and icon
+    // -----------------------------------------------------------------------
+
+    fn temp_config(name: &str, body: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("zeromcp-{}-{name}.json", std::process::id()));
+        std::fs::write(&path, body).unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn page_size_from_config_paginates_tools_list() {
+        let path = temp_config("page-size", r#"{"page_size": 1}"#);
+        let mut server = Server::from_config(path.to_str().unwrap());
+        let _ = std::fs::remove_file(&path);
+        server.add_tool("alpha", "first", Input::new(), |_, _| Box::pin(async { Ok(json!("a")) }));
+        server.add_tool("beta", "second", Input::new(), |_, _| Box::pin(async { Ok(json!("b")) }));
+        let resp = server.handle_request(&json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/list"
+        })).await.unwrap();
+        assert_eq!(resp["result"]["tools"].as_array().unwrap().len(), 1);
+        assert!(resp["result"]["nextCursor"].is_string());
+    }
+
+    #[tokio::test]
+    async fn prepare_resolves_config_icon_unless_set_in_code() {
+        let path = temp_config("icon", r#"{"icon": "data:image/png;base64,QUJD"}"#);
+        let mut server = Server::from_config(path.to_str().unwrap());
+        server.prepare().await;
+        assert_eq!(server.icon.as_deref(), Some("data:image/png;base64,QUJD"));
+
+        let mut server = Server::from_config(path.to_str().unwrap());
+        let _ = std::fs::remove_file(&path);
+        server.icon = Some("data:image/png;base64,Y29kZQ==".to_string());
+        server.prepare().await;
+        assert_eq!(server.icon.as_deref(), Some("data:image/png;base64,Y29kZQ=="));
     }
 }

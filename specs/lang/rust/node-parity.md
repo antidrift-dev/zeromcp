@@ -1,7 +1,7 @@
 # Node parity — Rust
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: cargo test 106 unit + 7 integration + 13 remote pass; conformance Rust 8/8 suites unchanged, route 5/5.
 
 ## Gaps
 1. Remote federation (`remote` config) in the built-in server

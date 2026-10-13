@@ -28,17 +28,19 @@
 
 pub mod config;
 pub mod registry;
+pub(crate) mod remote;
 pub mod sandbox;
 pub mod schema;
 pub mod server;
 pub mod types;
 
 // Re-export the main API surface.
-pub use config::Config;
+pub use config::{Config, RemoteServer};
 pub use schema::Input;
 pub use server::Server;
 pub use types::{
-    BoxFuture, Ctx, ExecuteFn, Permissions, RouteConfig, Tool, ToolResult,
+    BoxFuture, Ctx, ExecuteFn, Permissions, RouteConfig, RuntimeFn, RuntimeValue, Tool,
+    ToolResult,
     // v0.2.0: resources
     ReadFn, ReadFuture, Resource, ResourceTemplate, TemplateReadFn,
     // v0.2.0: prompts

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::any::Any;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -25,12 +27,27 @@ pub struct Permissions {
     pub execute_timeout: Option<u64>,
 }
 
+/// A caller-supplied runtime value, type-erased. Read it with `Ctx::runtime_as`.
+pub type RuntimeValue = Arc<dyn Any + Send + Sync>;
+
+/// A getter called on every local tool execution to produce `Ctx::runtime`.
+pub type RuntimeFn = Arc<dyn Fn() -> Option<RuntimeValue> + Send + Sync>;
+
 /// Context passed to every tool execution.
 #[derive(Clone)]
 pub struct Ctx {
     pub permissions: Permissions,
     pub logging: bool,
     pub bypass: bool,
+    /// Value from the getter set with `Server::set_runtime`, if any.
+    pub runtime: Option<RuntimeValue>,
+}
+
+impl Ctx {
+    /// Downcast `runtime` to `T`. `None` if unset or a different type.
+    pub fn runtime_as<T: Any>(&self) -> Option<&T> {
+        self.runtime.as_ref()?.downcast_ref::<T>()
+    }
 }
 
 impl Default for Ctx {
@@ -39,6 +56,7 @@ impl Default for Ctx {
             permissions: Permissions::default(),
             logging: false,
             bypass: false,
+            runtime: None,
         }
     }
 }
