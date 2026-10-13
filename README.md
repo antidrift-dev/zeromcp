@@ -183,7 +183,7 @@ For local development, `"bypass_permissions": true` allows all access with warni
 
 ## Performance
 
-Benchmarked against every official MCP SDK across all 10 languages.
+Benchmarked against every official MCP SDK across all 10 languages. Full results and write-ups: [zeromcp-benchmarks](https://github.com/antidrift-dev/zeromcp-benchmarks).
 
 | Language | vs. Official SDK | HTTP throughput | Memory |
 |---|---|---|---|
@@ -202,7 +202,7 @@ The "vs. Official SDK" column is stdio throughput (1,000 requests). ZeroMCP runs
 
 Over sustained HTTP load (5 minutes), ZeroMCP is 1.4x to 92x faster than official SDKs across all 10 languages. The official Rust SDK leaks to 2.4 GB in 5 minutes; ZeroMCP Rust uses 3 MB.
 
-A 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse. ZeroMCP survives 21-22/22 attacks across all 10 languages. Official SDKs survive 19-20/21.
+A 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse. ZeroMCP survives 21-22/22 attacks across all 10 languages. Official SDKs survive 19-20/21. [Full chaos results](https://github.com/antidrift-dev/zeromcp-benchmarks/blob/main/writeups/chaos-resilience.md).
 
 ## Configuration
 
