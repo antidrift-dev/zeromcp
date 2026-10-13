@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Ruby
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: Ruby unit suite 167 runs / 0 failures; Ruby conformance suites all pass; Route + OpenAPI Ruby 5/5 via `tests/conformance/harness/ruby/route-harness.rb`; `grep -rni webrick ruby/lib` is empty.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `ZeroMcp::Registry` (routes, OpenAPI, MCP handler as plain data) and `Server#handle_request` already cover that. The built-in WEBrick server is the one piece that pulls an HTTP stack into the gem.

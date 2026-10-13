@@ -128,4 +128,11 @@ class TestResourceScanner < Minitest::Test
     assert_empty scanner.resources
     assert_empty scanner.templates
   end
+
+  def test_path_hash_entries_load
+    config = ZeroMcp::Config.new('resources' => [{ 'path' => File.join(__dir__, 'fixtures', 'resources'), 'prefix' => 'p' }])
+    scanner = ZeroMcp::ResourceScanner.new(config)
+    capture_io { scanner.scan }
+    assert scanner.resources.key?('data')
+  end
 end

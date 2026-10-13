@@ -2,7 +2,10 @@
 
 require 'minitest/autorun'
 require 'json'
-require_relative '../lib/zeromcp/server'
+require 'tmpdir'
+require 'open3'
+require 'rbconfig'
+require_relative '../lib/zeromcp'
 
 class TestServer < Minitest::Test
   def setup
@@ -324,8 +327,7 @@ class TestServer < Minitest::Test
       route: { method: 'PUT', path: '/items/:id' }
     ) { |_args, _ctx| {} }
 
-    @server.instance_variable_get(:@tools)['update_item'] = tool
-    spec = @server.send(:build_openapi_spec)
+    spec = ZeroMcp::OpenApi.build({ 'update_item' => tool }, @config)
     operation = spec['paths']['/items/{id}']['put']
 
     # Path param is documented in `parameters`, not just buried in the body.
@@ -340,5 +342,82 @@ class TestServer < Minitest::Test
     body_props = operation['requestBody']['content']['application/json']['schema']['properties']
     refute body_props.key?('id')
     assert body_props.key?('name')
+  end
+
+  # --- Runtime context ---
+
+  def runtime_server(get_runtime)
+    tool = ZeroMcp::Tool.new(name: 'whoami', description: 'runtime') { |_args, ctx| ctx.runtime }
+    ZeroMcp::Server.new(ZeroMcp::Config.new, tools: { 'whoami' => tool }, get_runtime: get_runtime)
+  end
+
+  def call_whoami(server)
+    server.handle_request({ 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => { 'name' => 'whoami' } })
+  end
+
+  def test_get_runtime_sets_ctx_runtime
+    server = runtime_server(-> { { 'db' => :x } })
+    assert_equal '{"db":"x"}', call_whoami(server)['result']['content'][0]['text']
+  end
+
+  def test_no_get_runtime_leaves_ctx_runtime_nil
+    server = runtime_server(nil)
+    assert_equal 'null', call_whoami(server)['result']['content'][0]['text']
+  end
+
+  def test_get_runtime_called_once_per_call
+    calls = 0
+    server = runtime_server(-> { calls += 1 })
+    call_whoami(server)
+    call_whoami(server)
+    assert_equal 2, calls
+  end
+
+  def test_get_runtime_reaches_scanned_tools
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, 'whoami.rb'), "tool description: 'w'\nexecute { |_a, ctx| ctx.runtime }\n")
+      server = ZeroMcp::Server.new(ZeroMcp::Config.new('tools' => dir), get_runtime: -> { 'rt' })
+      capture_io { server.load_tools }
+      assert_equal 'rt', call_whoami(server)['result']['content'][0]['text']
+    end
+  end
+
+  # --- Removed HTTP transport ---
+
+  LIB = File.expand_path('../lib', __dir__)
+
+  def run_serve_with(config)
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'zeromcp.config.json')
+      File.write(path, JSON.generate(config))
+      script = "require 'zeromcp'; ZeroMcp.serve(ARGV[0])"
+      Open3.capture3(RbConfig.ruby, '-I', LIB, '-e', script, path, stdin_data: '')
+    end
+  end
+
+  def test_http_transport_fails_at_startup
+    _out, err, status = run_serve_with({ 'tools' => [], 'transport' => { 'type' => 'http', 'port' => 1 } })
+    assert_equal 1, status.exitstatus
+    assert_includes err, 'The built-in HTTP transport was removed'
+    assert_includes err, 'ZeroMcp.create_registry'
+  end
+
+  def test_http_transport_in_list_fails_without_stdio_fallback
+    out, err, status = run_serve_with({ 'tools' => [], 'transport' => [{ 'type' => 'stdio' }, { 'type' => 'http' }] })
+    assert_equal 1, status.exitstatus
+    assert_includes err, 'ZeroMcp.create_registry'
+    refute_includes err, 'stdio transport ready'
+    assert_empty out
+  end
+
+  def test_stdio_transport_still_serves
+    _out, err, status = run_serve_with({ 'tools' => [], 'transport' => [{ 'type' => 'stdio' }] })
+    assert_equal 0, status.exitstatus
+    assert_includes err, 'stdio transport ready'
+  end
+
+  def test_server_has_no_serve_http
+    refute ZeroMcp::Server.method_defined?(:serve_http)
+    refute ZeroMcp.respond_to?(:serve_http)
   end
 end

@@ -13,38 +13,43 @@ module ZeroMcp
 
     def scan
       @tools.clear
-      dirs = @config.tools_dir
-      dirs = [dirs] unless dirs.is_a?(Array)
 
-      dirs.each do |d|
-        dir = File.expand_path(d)
+      @config.tool_sources.each do |source|
+        dir = File.expand_path(source['path'])
         unless Dir.exist?(dir)
           $stderr.puts "[zeromcp] Cannot read tools directory: #{dir}"
           next
         end
-        scan_dir(dir, dir)
+        scan_dir(dir, dir, source['prefix'])
       end
       @tools
     end
 
+    # The tool source directories, expanded. Used by the autoload watcher.
+    def source_dirs
+      @config.tool_sources.map { |s| File.expand_path(s['path']) }
+    end
+
     private
 
-    def scan_dir(dir, root_dir)
+    def scan_dir(dir, root_dir, source_prefix = nil)
       Dir.entries(dir).sort.each do |entry|
         next if entry.start_with?('.')
 
         full_path = File.join(dir, entry)
 
         if File.directory?(full_path)
-          scan_dir(full_path, root_dir)
+          scan_dir(full_path, root_dir, source_prefix)
         elsif entry.end_with?('.rb')
-          load_tool(full_path, root_dir)
+          load_tool(full_path, root_dir, source_prefix)
         end
       end
     end
 
-    def load_tool(file_path, root_dir)
-      name = build_name(file_path, root_dir)
+    def load_tool(file_path, root_dir, source_prefix = nil)
+      name = build_name(file_path, root_dir, source_prefix)
+      rel_parts = Pathname.new(file_path).relative_path_from(Pathname.new(root_dir)).to_s.split('/')
+      credentials_ns = rel_parts.length > 1 ? rel_parts[0] : nil
 
       # Each tool file should return a hash via a special structure.
       # We use a sandboxed binding to evaluate the file.
@@ -58,7 +63,8 @@ module ZeroMcp
         description: tool_def[:description] || '',
         input: tool_def[:input] || {},
         permissions: tool_def[:permissions] || {},
-        route: tool_def[:route]
+        route: tool_def[:route],
+        credentials_ns: credentials_ns
       ) { |args, ctx| tool_def[:execute].call(args, ctx) }
 
       $stderr.puts "[zeromcp] Loaded: #{name}"
@@ -73,17 +79,38 @@ module ZeroMcp
       loader._tool_definition
     end
 
-    def build_name(file_path, root_dir)
+    # inner = filename, or "<dir_prefix><sep><filename>" for a file under a
+    # subdir, where dir_prefix is namespacing[<top dir>]['prefix'] when that
+    # key is set (an empty string means no prefix) and the dir name otherwise.
+    # A source prefix is then prepended: "<source_prefix><sep><inner>".
+    def build_name(file_path, root_dir, source_prefix = nil)
       rel = Pathname.new(file_path).relative_path_from(Pathname.new(root_dir)).to_s
       parts = rel.split('/')
       filename = File.basename(parts.pop, '.rb')
+      sep = @config.separator
 
+      inner = filename
       if parts.length > 0
-        dir_prefix = parts[0]
-        "#{dir_prefix}#{@config.separator}#{filename}"
-      else
-        filename
+        dir = parts[0]
+        dir_prefix = namespace_prefix(dir)
+        dir_prefix = dir if dir_prefix.nil?
+        inner = "#{dir_prefix}#{sep}#{filename}" unless dir_prefix.empty?
       end
+
+      source_prefix && !source_prefix.empty? ? "#{source_prefix}#{sep}#{inner}" : inner
+    end
+
+    # namespacing[dir]['prefix'] (string or symbol keys), or nil when unset.
+    def namespace_prefix(dir)
+      ns = @config.namespacing
+      return nil unless ns.is_a?(Hash)
+
+      entry = ns.key?(dir) ? ns[dir] : ns[dir.to_sym]
+      return nil unless entry.is_a?(Hash)
+      return entry['prefix'].to_s if entry.key?('prefix') && !entry['prefix'].nil?
+      return entry[:prefix].to_s if entry.key?(:prefix) && !entry[:prefix].nil?
+
+      nil
     end
 
     def log_permissions(name, permissions)
