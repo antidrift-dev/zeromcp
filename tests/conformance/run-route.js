@@ -39,10 +39,9 @@ const implementations = [
   {
     name: 'PHP',
     command: 'php',
-    args: [join(root, 'php/zeromcp.php'), 'serve', '--config', join(__dirname, 'route-config-php.json')],
+    args: ['-S', '127.0.0.1:14253', join(__dirname, 'route-harness-php.php')],
     env: {},
     port: 14253,
-    optional: true,
   },
   // Compiled: started via pre-built route-test binaries
   {
