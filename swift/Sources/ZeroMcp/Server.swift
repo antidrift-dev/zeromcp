@@ -22,8 +22,49 @@ public class ZeroMcp {
     /// Page size for cursor-based pagination. 0 means no pagination.
     public var pageSize: Int = 0
 
+    /// Called once per local tool execution; the result is passed as
+    /// `ctx.runtime`. Remote tools don't receive it.
+    public var getRuntime: (() -> Any?)?
+
+    /// Names of tools that came from `config.remote` (and weren't overridden locally).
+    var remoteToolNames: Set<String> = []
+    private var prepared = false
+    private var remotesConnected = false
+
     public init(config: ZeroMcpConfig? = nil) {
         self.config = config ?? ZeroMcpConfig.load()
+        self.pageSize = self.config.pageSize ?? 0
+    }
+
+    /// Resolves async, config-driven state: connects `config.remote` and
+    /// resolves `config.icon`. Idempotent. Called automatically by `serve()`
+    /// and `createRegistry`. If you use `handleRequest` directly, call it once
+    /// after registering tools and before handling requests.
+    public func prepare() async {
+        if prepared { return }
+        prepared = true
+        await connectRemotes()
+        if icon == nil {
+            icon = await resolveIcon(config.icon)
+        }
+    }
+
+    /// Connect `config.remote` and merge its tools in. A local tool with the
+    /// same name wins. Runs at most once.
+    func connectRemotes() async {
+        if remotesConnected { return }
+        remotesConnected = true
+        guard let servers = config.remote, !servers.isEmpty else { return }
+
+        let remoteTools = await RemoteManager().connect(servers)
+        for (name, tool) in remoteTools {
+            if tools[name] != nil {
+                fputs(stderr, "[zeromcp] Local tool \"\(name)\" overrides remote\n")
+                continue
+            }
+            tools[name] = tool
+            remoteToolNames.insert(name)
+        }
     }
 
     // Register a tool using builder pattern
@@ -35,6 +76,7 @@ public class ZeroMcp {
         route: RouteDefinition? = nil,
         execute: @escaping ([String: Any], ToolContext) async throws -> Any
     ) {
+        remoteToolNames.remove(name)
         tools[name] = ToolDefinition(
             description: description,
             input: input,
@@ -51,6 +93,7 @@ public class ZeroMcp {
         execute: @escaping ([String: Any], ToolContext) async throws -> Any
     ) {
         let b = builder()
+        remoteToolNames.remove(name)
         tools[name] = ToolDefinition(
             description: b.description,
             input: b.input,
@@ -75,6 +118,13 @@ public class ZeroMcp {
     }
 
     public func serve() async {
+        if let message = transportError(config) {
+            fputs(stderr, message + "\n")
+            exit(1)
+        }
+
+        await prepare()
+
         fputs(stderr, "[zeromcp] \(tools.count) tool(s) loaded\n")
         fputs(stderr, "[zeromcp] stdio transport ready\n")
 
@@ -429,7 +479,8 @@ public class ZeroMcp {
         let timeoutSecs = tool.permissions.executeTimeout ?? config.executeTimeout ?? 30.0
 
         do {
-            let ctx = ToolContext(toolName: name, permissions: tool.permissions)
+            let runtime: Any? = remoteToolNames.contains(name) ? nil : getRuntime?()
+            let ctx = ToolContext(toolName: name, permissions: tool.permissions, runtime: runtime)
             let result = try await withThrowingTaskGroup(of: Any.self) { group in
                 group.addTask {
                     return try await tool.execute(args, ctx)

@@ -621,4 +621,129 @@ final class ServerTests: XCTestCase {
         XCTAssertEqual(tools.count, 1)
         XCTAssertEqual(tools[0]["name"] as? String, "echo")
     }
+
+    // MARK: - Runtime context
+
+    private func callText(_ server: ZeroMcp, _ name: String) async -> String? {
+        let resp = await server.handleRequest(jsonrpc("tools/call", params: ["name": name, "arguments": [:] as [String: Any]]))
+        return (((resp?["result"] as? [String: Any])?["content"] as? [[String: Any]])?.first)?["text"] as? String
+    }
+
+    func testGetRuntimeReachesCtxRuntime() async {
+        let server = ZeroMcp(config: ZeroMcpConfig())
+        server.getRuntime = { "tenant-42" }
+        server.tool("whoami", description: "who") { _, ctx in ctx.runtime as? String ?? "none" }
+        let text = await callText(server, "whoami")
+        XCTAssertEqual(text, "tenant-42")
+    }
+
+    func testCtxRuntimeNilWithoutGetRuntime() async {
+        let server = ZeroMcp(config: ZeroMcpConfig())
+        server.tool("whoami", description: "who") { _, ctx in ctx.runtime == nil ? "nil" : "set" }
+        let text = await callText(server, "whoami")
+        XCTAssertEqual(text, "nil")
+    }
+
+    func testGetRuntimeCalledOncePerCall() async {
+        let server = ZeroMcp(config: ZeroMcpConfig())
+        var calls = 0
+        server.getRuntime = { calls += 1; return calls }
+        server.tool("whoami", description: "who") { _, ctx in "\(ctx.runtime as? Int ?? -1)" }
+        let first = await callText(server, "whoami")
+        let second = await callText(server, "whoami")
+        XCTAssertEqual(first, "1")
+        XCTAssertEqual(second, "2")
+        XCTAssertEqual(calls, 2)
+    }
+
+    // MARK: - Config keys: page_size, icon
+
+    func testPageSizeDecodesAndPaginates() async throws {
+        let config = try JSONDecoder().decode(ZeroMcpConfig.self, from: Data(#"{"page_size": 1}"#.utf8))
+        XCTAssertEqual(config.pageSize, 1)
+        let server = ZeroMcp(config: config)
+        XCTAssertEqual(server.pageSize, 1)
+        server.tool("a", description: "a") { _, _ in "" }
+        server.tool("b", description: "b") { _, _ in "" }
+        let resp = await server.handleRequest(jsonrpc("tools/list"))
+        let result = resp?["result"] as? [String: Any]
+        XCTAssertEqual((result?["tools"] as? [[String: Any]])?.count, 1)
+        XCTAssertNotNil(result?["nextCursor"])
+    }
+
+    func testIconDecodesFromConfig() throws {
+        let config = try JSONDecoder().decode(ZeroMcpConfig.self, from: Data(#"{"icon": "data:image/png;base64,AA=="}"#.utf8))
+        XCTAssertEqual(config.icon, "data:image/png;base64,AA==")
+    }
+
+    func testIconDataUriPassesThrough() async {
+        let server = ZeroMcp(config: ZeroMcpConfig(icon: "data:image/png;base64,AA=="))
+        await server.prepare()
+        XCTAssertEqual(server.icon, "data:image/png;base64,AA==")
+    }
+
+    func testIconSvgFileBecomesDataUri() async throws {
+        let path = NSTemporaryDirectory() + "zeromcp-icon-\(UUID().uuidString).svg"
+        let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>"
+        try svg.write(toFile: path, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        let server = ZeroMcp(config: ZeroMcpConfig(icon: path))
+        await server.prepare()
+        XCTAssertEqual(server.icon, "data:image/svg+xml;base64,\(Data(svg.utf8).base64EncodedString())")
+
+        let resp = await server.handleRequest(jsonrpc("initialize"))
+        let serverInfo = (resp?["result"] as? [String: Any])?["serverInfo"] as? [String: Any]
+        XCTAssertEqual(serverInfo?["icon"] as? String, server.icon)
+    }
+
+    func testIconMissingFileLeavesIconNil() async {
+        let server = ZeroMcp(config: ZeroMcpConfig(icon: "/nonexistent/zeromcp-icon.png"))
+        let log = await captureStderr { await server.prepare() }
+        XCTAssertNil(server.icon)
+        XCTAssertTrue(log.contains("[zeromcp] Warning: failed to read icon file /nonexistent/zeromcp-icon.png"), log)
+    }
+
+    func testIconSetInCodeIsNotOverwritten() async {
+        let server = ZeroMcp(config: ZeroMcpConfig(icon: "data:image/png;base64,AA=="))
+        server.icon = "https://example.com/mine.png"
+        await server.prepare()
+        XCTAssertEqual(server.icon, "https://example.com/mine.png")
+    }
+
+    func testIconUrlIsFetched() async {
+        // Any HTTP endpoint will do: the fake upstream answers JSON, so the
+        // data URI carries its Content-Type.
+        let up = FakeUpstream()
+        defer { up.stop() }
+        let icon = await resolveIcon(up.url)
+        XCTAssertTrue(icon?.hasPrefix("data:application/json;base64,") ?? false, icon ?? "nil")
+    }
+
+    // MARK: - http transport rejected
+
+    func testHttpTransportIsAnError() throws {
+        let json = #"{"title":"T","transport":[{"type":"http","port":3000}]}"#
+        let config = try JSONDecoder().decode(ZeroMcpConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.title, "T")
+        let message = transportError(config)
+        XCTAssertNotNil(message)
+        XCTAssertTrue(message?.contains("createRegistry") ?? false)
+    }
+
+    func testHttpTransportSingleObjectIsAnError() throws {
+        let json = #"{"transport":{"type":"http","port":3000}}"#
+        let config = try JSONDecoder().decode(ZeroMcpConfig.self, from: Data(json.utf8))
+        XCTAssertNotNil(transportError(config))
+    }
+
+    func testStdioTransportPasses() throws {
+        let json = #"{"transport":[{"type":"stdio"}]}"#
+        let config = try JSONDecoder().decode(ZeroMcpConfig.self, from: Data(json.utf8))
+        XCTAssertNil(transportError(config))
+    }
+
+    func testNoTransportKeyPasses() {
+        XCTAssertNil(transportError(ZeroMcpConfig()))
+    }
 }

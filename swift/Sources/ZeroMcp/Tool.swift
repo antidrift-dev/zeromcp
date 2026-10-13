@@ -35,11 +35,20 @@ public struct ToolContext {
     public let toolName: String
     public let credentials: Any?
     public let permissions: Permissions
+    /// Value returned by `getRuntime` (on `ZeroMcp` or `RegistryOptions`) for
+    /// this execution, or nil when no hook is set. Remote tools never get it.
+    public let runtime: Any?
 
-    public init(toolName: String, credentials: Any? = nil, permissions: Permissions = Permissions()) {
+    public init(
+        toolName: String,
+        credentials: Any? = nil,
+        permissions: Permissions = Permissions(),
+        runtime: Any? = nil
+    ) {
         self.toolName = toolName
         self.credentials = credentials
         self.permissions = permissions
+        self.runtime = runtime
     }
 }
 

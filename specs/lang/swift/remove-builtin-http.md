@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Swift
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker (Linux): `swift test` 109/109 incl. transport-check tests; route conformance 5/5 via the rewritten RouteTest harness; Verify greps clean, HttpServer.swift gone.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `createRegistry(_:options:)` (routes, OpenAPI, MCP handler as plain data, `Sources/ZeroMcp/Registry.swift:45-65`) and `ZeroMcp.handleRequest(_:)` (`Sources/ZeroMcp/Server.swift:109`) already cover that. `ZeroMcp.serveHttp(port:)` is a hand-rolled POSIX-socket server inside the library.

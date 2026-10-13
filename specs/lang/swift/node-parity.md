@@ -1,7 +1,7 @@
 # Node parity — Swift
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker (Linux): `swift test` 109/109 (new RemoteTests 20, RegistryTests +4, ServerTests +14); conformance Swift 8/8 stdio suites + route 5/5.
 
 ## Gaps
 1. Remote federation (`remote` config) in the built-in server
