@@ -62,35 +62,13 @@ Point to one or multiple tool directories:
 
 ## Transport
 
-stdio for local MCP clients. Built-in HTTP for development and testing. Library export for production.
+stdio is the only built-in transport, and the default. There is no built-in HTTP server: for HTTP, mount the handler or the registry in your own server (see [How it works](https://github.com/antidrift-dev/zeromcp/blob/main/docs/how-it-works.md)). A config with an `http` transport fails at startup and names the replacement.
 
 ```json
-// stdio only (default)
 {
-  "transport": {
-    "type": "stdio"
-  }
-}
-
-// HTTP for dev/testing
-{
-  "transport": {
-    "type": "http",
-    "port": 4242,
-    "auth": "env:MCP_TOKEN"
-  }
-}
-
-// Both
-{
-  "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242 }
-  ]
+  "transport": { "type": "stdio" }
 }
 ```
-
-The built-in HTTP server is a convenience for development. In production, use the [library export](https://github.com/antidrift-dev/zeromcp/blob/main/docs/guides/tool-authoring.md) to serve through your own infrastructure.
 
 ## Credentials
 

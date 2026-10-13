@@ -51,10 +51,10 @@ Output goes to stderr. stdout is reserved for MCP JSON-RPC.
 
 ### Streamable HTTP
 
-ZeroMCP supports streamable HTTP by default. Embed the handler in any HTTP framework:
+ZeroMCP supports streamable HTTP through your own server. Embed the handler in any HTTP framework:
 
 ```javascript
-import { createHandler } from 'zeromcp/handler';
+import { createHandler } from '@antidrift/zeromcp/handler';
 
 const handler = await createHandler('./tools');
 
@@ -64,19 +64,9 @@ app.post('/mcp', async (req, res) => res.json(await handler(req.body)));
 
 No proxy. No sidecar. The handler runs in your process, behind your router.
 
-### Both at once
+### No built-in HTTP server
 
-Run stdio and HTTP from the same config:
-
-```json
-{
-  "tools": "./tools",
-  "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242 }
-  ]
-}
-```
+ZeroMCP doesn't run an HTTP server of its own. stdio is the only built-in transport; for HTTP you mount the handler (or the registry, for REST routes and OpenAPI) in the server you already run. A config with an `http` transport fails at startup and says what to use instead.
 
 ## What happens under the hood
 

@@ -33,7 +33,7 @@ The official SDK also has **no sandbox**. ZeroMCP enforces per-tool network allo
 ZeroMCP does not ship an HTTP server. The CLI speaks stdio only; for HTTP you mount ZeroMCP in the server you already run. `createHandler` works with any HTTP framework: you handle the transport, ZeroMCP handles the MCP protocol.
 
 ```js
-import { createHandler } from 'zeromcp/handler';
+import { createHandler } from '@antidrift/zeromcp/handler';
 
 const handler = await createHandler('./tools');
 ```
@@ -190,10 +190,10 @@ tools/
 ## Programmatic API
 
 ```js
-import { createHandler } from 'zeromcp/handler';   // HTTP handler
-import { ToolScanner } from 'zeromcp/scanner';      // Tool discovery
-import { toJsonSchema, validate } from 'zeromcp/schema'; // Schema utils
-import { createRegistry } from 'zeromcp/registry';  // Framework-neutral tool registry (MCP + REST + OpenAPI)
+import { createHandler } from '@antidrift/zeromcp/handler';   // HTTP handler
+import { ToolScanner } from '@antidrift/zeromcp/scanner';      // Tool discovery
+import { toJsonSchema, validate } from '@antidrift/zeromcp/schema'; // Schema utils
+import { createRegistry } from '@antidrift/zeromcp/registry';  // Framework-neutral tool registry (MCP + REST + OpenAPI)
 ```
 
 ### REST routes and OpenAPI

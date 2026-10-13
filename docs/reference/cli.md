@@ -4,7 +4,7 @@ ZeroMCP ships two commands: `serve` and `audit`.
 
 ## zeromcp serve
 
-Start the MCP server. Scans tool directories, connects remote servers, and serves over configured transports.
+Start the MCP server over stdio. Scans tool directories and connects remote servers. There is no built-in HTTP server; mount the handler or registry in your own server for HTTP.
 
 ```
 zeromcp serve [options] [config-path]
@@ -20,9 +20,6 @@ zeromcp serve [options] [config-path]
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--transport`, `-t` | `stdio` | Transport protocol: `stdio` or `http` |
-| `--port`, `-p` | `3000` | Port for HTTP transport (ignored for stdio) |
-| `--host` | `127.0.0.1` | Bind address for HTTP transport |
 | `--tools` | `./tools` | Override tool directory (takes precedence over config file) |
 | `--watch`, `-w` | `false` | Watch tool files for changes and hot-reload |
 | `--verbose`, `-v` | `false` | Enable verbose logging to stderr |
@@ -44,19 +41,7 @@ $ zeromcp serve
 [zeromcp] stdio transport ready
 ```
 
-### Example: HTTP transport
-
-```
-$ zeromcp serve --transport http --port 8080
-[zeromcp] v0.1.0
-[zeromcp] Config: ./zeromcp.config.json
-[zeromcp] Tools:  ./tools
-[zeromcp] Loaded: hello
-[zeromcp] 1 local + 0 remote = 1 tool(s)
-[zeromcp] HTTP transport listening on http://localhost:8080/mcp
-```
-
-All log output goes to stderr. For stdio transport, stdout is reserved for MCP JSON-RPC communication. For HTTP transport, the server listens on the specified port.
+All log output goes to stderr. stdout is reserved for MCP JSON-RPC communication.
 
 ## zeromcp audit
 

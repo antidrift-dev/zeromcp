@@ -16,14 +16,7 @@ Complete reference for `zeromcp.config.json`.
       "prefix": "shared"
     }
   ],
-  "transport": [
-    { "type": "stdio" },
-    {
-      "type": "http",
-      "port": 4242,
-      "auth": "env:MCP_AUTH_TOKEN"
-    }
-  ],
+  "transport": { "type": "stdio" },
   "credentials": {
     "stripe": {
       "env": "STRIPE_SECRET_KEY"
@@ -40,7 +33,8 @@ Complete reference for `zeromcp.config.json`.
     {
       "name": "jira",
       "url": "http://localhost:3002/mcp",
-      "auth": "env:JIRA_TOKEN"
+      "auth": "env:JIRA_TOKEN",
+      "tools": ["search_issues", "get_issue"]
     }
   ],
   "logging": true,
@@ -69,9 +63,9 @@ Where to scan for tool files. Accepts a single directory path, or an array of pa
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `type` | `"stdio" | "http"` | Transport type |
-| `port` | `number` | HTTP port (default: 4242) |
-| `auth` | `string` | Auth token or `"env:VAR_NAME"` |
+| `type` | `"stdio"` | Transport type. `stdio` is the only built-in transport. |
+
+There is no built-in HTTP server. A transport of any other type, including `"http"`, fails at startup with a message naming the handler and registry to mount in your own server.
 
 ## credentials
 
@@ -82,7 +76,7 @@ Maps directory names to credential sources. Tools in `tools/stripe/` get the cre
 
 ## remote
 
-**Type:** `Array<{ name, url, auth? }>`  
+**Type:** `Array<{ name, url, auth?, tools? }>`  
 **Default:** `[]`
 
 | Field | Type | Description |
@@ -90,6 +84,9 @@ Maps directory names to credential sources. Tools in `tools/stripe/` get the cre
 | `name` | `string` | Namespace prefix for this server's tools |
 | `url` | `string` | HTTP/HTTPS URL of the MCP server |
 | `auth` | `string` | Bearer token or `"env:VAR_NAME"` |
+| `tools` | `string[]` | Upstream tool names to expose. Omit to expose every tool the server lists. |
+
+Remote tools appear as `<name>.<tool>`. A local tool with the same name overrides the remote one. A server that fails to connect is logged and skipped.
 
 ## Other fields
 

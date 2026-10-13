@@ -213,27 +213,26 @@ All implementations support an optional `zeromcp.config.json`:
 ```json
 {
   "tools": ["./tools"],
-  "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242, "auth": "env:TOKEN" }
-  ],
   "logging": true,
   "bypass_permissions": false,
   "credentials": {
     "api": { "env": "API_KEY" }
   },
   "remote": [
-    { "name": "other-server", "url": "http://localhost:5000", "auth": "env:TOKEN" }
-  ]
+    { "name": "other-server", "url": "http://localhost:5000", "auth": "env:TOKEN", "tools": ["search"] }
+  ],
+  "autoload_tools": true
 }
 ```
 
+`remote` federates other MCP servers: their tools appear as `<name>.<tool>`, `tools` optionally limits which ones, and a local tool with the same name wins. `autoload_tools` reloads tools when their files change, in the languages that load tools from directories (Node.js, Python, Go, Ruby, PHP).
+
 ## HTTP / Streamable HTTP
 
-ZeroMCP doesn't own the HTTP layer — you bring your own framework. ZeroMCP gives you a handler function that takes JSON-RPC in and returns JSON-RPC out.
+ZeroMCP doesn't own the HTTP layer and ships no HTTP server — you bring your own framework. ZeroMCP gives you a handler function that takes JSON-RPC in and returns JSON-RPC out, and a registry (`createRegistry` and its equivalent in every language) that adds REST routes and an OpenAPI document as plain data. A config with an `http` transport fails at startup.
 
 ```js
-import { createHandler } from 'zeromcp/handler';
+import { createHandler } from '@antidrift/zeromcp/handler';
 
 const handler = await createHandler('./tools');
 
@@ -258,7 +257,7 @@ See [Node.js README](nodejs/) for examples with Express, Fastify, Hono, Cloudfla
 
 ## Testing
 
-A cross-language conformance suite validates all implementations across 10 suites and 67 test implementations covering protocol compliance, sandbox enforcement, timeout handling, credential isolation, namespace resolution, and HTTP transport. 0 failures, 0 skipped. Additionally, a 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse.
+A cross-language conformance suite validates all implementations across 10 suites and 67 test implementations covering protocol compliance, sandbox enforcement, timeout handling, credential isolation, namespace resolution, and HTTP routes mounted through the registry. 0 failures, 0 skipped. Additionally, a 22-attack chaos monkey suite tests resilience against malformed input, giant payloads, concurrent floods, and protocol abuse.
 
 ### Run with Docker (all languages)
 
