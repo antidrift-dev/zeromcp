@@ -23,10 +23,18 @@ public struct RegistryOptions {
     /// side effect. An embeddable library must not do ambient
     /// filesystem I/O by default; pass ZeroMcpConfig.load() explicitly
     /// if that behavior is wanted.
+    /// `config.remote` servers are connected and merged into `mcp` (local
+    /// tools win); they never appear in `routes` or `openapi`.
     public var config: ZeroMcpConfig
 
-    public init(config: ZeroMcpConfig = ZeroMcpConfig()) {
+    /// Called once per local tool execution through `mcp` `tools/call`; the
+    /// result is passed as `ctx.runtime` (Node's `getEnv`). Direct
+    /// `routes[i].tool.execute` calls build their own context.
+    public var getRuntime: (() -> Any?)?
+
+    public init(config: ZeroMcpConfig = ZeroMcpConfig(), getRuntime: (() -> Any?)? = nil) {
         self.config = config
+        self.getRuntime = getRuntime
     }
 }
 
@@ -45,9 +53,11 @@ public struct Registry {
 public func createRegistry(
     _ tools: [String: ToolDefinition],
     options: RegistryOptions = RegistryOptions()
-) -> Registry {
+) async -> Registry {
     let instance = ZeroMcp(config: options.config)
     instance.tools = tools
+    instance.getRuntime = options.getRuntime
+    await instance.connectRemotes()
 
     let routes = tools
         .filter { $0.value.route != nil }
