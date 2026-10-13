@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Rust
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: cargo test all pass; conformance Rust 8/8 suites unchanged; route 3/5 -> 5/5 via create_registry harness; chaos 21/22 unchanged.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `zeromcp::registry::create_registry` (routes, OpenAPI, MCP handler as plain data) and `Server::handle_request` already cover that. `Server::serve_http` is the one piece that runs its own listener inside the crate.
