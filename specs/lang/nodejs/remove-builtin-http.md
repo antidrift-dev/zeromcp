@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Node.js
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Docker: `npm test` 163/163 (was 160; 3 new in `test/http-removed.test.js`); conformance Node.js passes all 12 stdio suites as before, Route 5/5 and HTTP no-auth 1/1 via harnesses in `tests/conformance/harness/nodejs/`; HTTP auth row removed as specced.
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `createHandler` (`@antidrift/zeromcp/handler`) and `createRegistry` (`@antidrift/zeromcp/registry`: routes, OpenAPI, MCP handler as plain data) already cover that. The `node:http` server inside `serve()` is the one piece where the package owns a listener.

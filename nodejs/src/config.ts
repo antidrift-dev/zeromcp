@@ -20,9 +20,7 @@ export interface CredentialSource {
 }
 
 export interface TransportConfig {
-  type: 'stdio' | 'http';
-  port?: number;
-  auth?: string;
+  type: 'stdio';
 }
 
 export interface ToolSource {
