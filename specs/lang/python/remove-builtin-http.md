@@ -1,7 +1,7 @@
 # Remove the built-in HTTP server — Python
 
 ## Status
-Not started. Spec only.
+Done (2026-10-13). Verified in Docker: 198 unit tests pass (2 new), every Python conformance suite passes, and Python route conformance is 5/5 via `route-harness-python.py` (was 4/5).
 
 ## Why
 ZeroMCP doesn't own the HTTP layer. Users run whatever HTTP server they already have and wire ZeroMCP in. `create_registry` (routes, OpenAPI, MCP handler as plain data, `python/zeromcp/registry.py:36-105`) and `create_handler` (`python/zeromcp/server.py:84-117`) already cover that. The hand-rolled `asyncio` server behind `transport: {"type": "http"}` is the one piece that puts an HTTP stack in the package.
