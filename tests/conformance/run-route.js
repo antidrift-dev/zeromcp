@@ -14,11 +14,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..');
 
 const implementations = [
-  // File-based: started via CLI with route config files
+  // Node.js: no built-in server; a test harness mounts createRegistry on node:http
   {
     name: 'Node.js',
     command: 'node',
-    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'route-config-node.json')],
+    args: [join(__dirname, 'harness/nodejs/route-harness.mjs')],
     env: {},
     port: 14250,
   },

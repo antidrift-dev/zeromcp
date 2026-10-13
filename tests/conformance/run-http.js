@@ -17,13 +17,6 @@ const TOKEN = 'test-token-xyz-789';
 
 const implementations = [
   {
-    name: 'Node.js',
-    command: 'node',
-    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'http-config-node.json')],
-    env: { TEST_MCP_TOKEN: TOKEN },
-    port: 14242,
-  },
-  {
     name: 'Go',
     command: 'bash',
     args: ['-c', `cp ${join(__dirname, 'http-config-go.json')} /tmp/zeromcp.config.json && cd /tmp && zeromcp-go-advanced`],
@@ -37,7 +30,8 @@ const noAuthImplementations = [
   {
     name: 'Node.js (no auth)',
     command: 'node',
-    args: [join(root, 'nodejs/bin/mcp.js'), 'serve', '--config', join(__dirname, 'http-config-node-noauth.json')],
+    // No built-in server; a test harness mounts createHandler on node:http
+    args: [join(__dirname, 'harness/nodejs/mcp-harness.mjs')],
     env: {},
     port: 14244,
   },

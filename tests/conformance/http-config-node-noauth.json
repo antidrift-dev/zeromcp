@@ -1,6 +1,0 @@
-{
-  "tools": ["./nodejs/examples/tools"],
-  "transport": [
-    { "type": "http", "port": 14244 }
-  ]
-}
