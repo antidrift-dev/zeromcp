@@ -3,6 +3,7 @@ package zeromcp
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -620,5 +621,82 @@ func TestBuildOpenAPISpecNonGETPathParam(t *testing.T) {
 		if r == "id" {
 			t.Error("expected \"id\" to be excluded from body required list")
 		}
+	}
+}
+
+func runtimeOf(t *testing.T, s *Server) any {
+	t.Helper()
+	resp := s.HandleRequest(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+		"params": map[string]any{"name": "rt", "arguments": map[string]any{}},
+	})
+	content := resp["result"].(map[string]any)["content"].([]any)
+	var v map[string]any
+	json.Unmarshal([]byte(content[0].(map[string]any)["text"].(string)), &v)
+	return v["runtime"]
+}
+
+func newRuntimeServer() *Server {
+	s := NewServer()
+	s.Tool("rt", Tool{
+		Input: Input{},
+		Execute: func(args map[string]any, ctx *Ctx) (any, error) {
+			return map[string]any{"runtime": ctx.Runtime}, nil
+		},
+	})
+	return s
+}
+
+func TestSetRuntimeCalledPerExecution(t *testing.T) {
+	s := newRuntimeServer()
+	n := 0
+	s.SetRuntime(func() any { n++; return n })
+
+	for want := 1; want <= 2; want++ {
+		if got := runtimeOf(t, s); got != float64(want) {
+			t.Errorf("call %d: expected runtime %d, got %v", want, want, got)
+		}
+	}
+}
+
+func TestRuntimeNilWithoutHook(t *testing.T) {
+	s := newRuntimeServer()
+	if got := runtimeOf(t, s); got != nil {
+		t.Errorf("expected nil runtime, got %v", got)
+	}
+}
+
+func TestRuntimeNilWhenHookReturnsNil(t *testing.T) {
+	s := newRuntimeServer()
+	s.SetRuntime(func() any { return nil })
+	if got := runtimeOf(t, s); got != nil {
+		t.Errorf("expected nil runtime, got %v", got)
+	}
+	// The shared ctx is never mutated by a runtime value.
+	s.SetRuntime(func() any { return "x" })
+	if got := runtimeOf(t, s); got != "x" {
+		t.Errorf("expected runtime x, got %v", got)
+	}
+	if s.tools["rt"].ctx.Runtime != nil {
+		t.Error("shared ctx was mutated")
+	}
+}
+
+func TestNotifyWritesNotificationLine(t *testing.T) {
+	s := NewServer()
+	s.Notify("notifications/tools/list_changed", map[string]any{}) // stdio not running: no-op
+
+	var buf strings.Builder
+	s.notify = func(line []byte) { buf.Write(line); buf.WriteString("\n") }
+	s.Notify("notifications/tools/list_changed", map[string]any{})
+	want := `{"jsonrpc":"2.0","method":"notifications/tools/list_changed","params":{}}` + "\n"
+	if buf.String() != want {
+		t.Errorf("got %q, want %q", buf.String(), want)
+	}
+
+	buf.Reset()
+	s.Notify("notifications/x", nil)
+	if buf.String() != `{"jsonrpc":"2.0","method":"notifications/x"}`+"\n" {
+		t.Errorf("nil params should be omitted, got %q", buf.String())
 	}
 }

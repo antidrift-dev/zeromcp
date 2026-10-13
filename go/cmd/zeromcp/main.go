@@ -32,7 +32,7 @@ func main() {
 
 func runServer(args []string) {
 	configPath := "zeromcp.config.json"
-	toolsDir := "./tools"
+	toolsDir := "" // empty: use config "tools" (default ./tools)
 
 	// Parse flags
 	for i := 0; i < len(args); i++ {
@@ -58,14 +58,36 @@ func runServer(args []string) {
 
 	srv := zeromcp.NewServerWithConfig(cfg)
 
-	// Try to scan for plugin .so files
-	absDir, _ := filepath.Abs(toolsDir)
-	scanner := zeromcp.NewScanner(absDir, cfg)
+	// Scan for plugin .so files. --tools overrides config "tools", as Node's
+	// positional tool dirs do.
+	var scanner *zeromcp.Scanner
+	if toolsDir != "" {
+		absDir, _ := filepath.Abs(toolsDir)
+		scanner = zeromcp.NewScanner(absDir, cfg)
+	} else {
+		scanner = zeromcp.NewScannerFromConfig(cfg)
+	}
 	if err := scanner.Scan(); err != nil {
-		fmt.Fprintf(os.Stderr, "[zeromcp] No tools directory found at %s\n", absDir)
+		fmt.Fprintf(os.Stderr, "[zeromcp] No tools directory found\n")
 		fmt.Fprintf(os.Stderr, "[zeromcp] Starting with 0 tools. Use the library API to register tools in code.\n")
 	} else {
 		scanner.RegisterAll(srv)
+	}
+
+	resources := zeromcp.NewResourceScanner(cfg)
+	resources.Scan()
+	resources.RegisterAll(srv)
+
+	prompts := zeromcp.NewPromptScanner(cfg)
+	prompts.Scan()
+	prompts.RegisterAll(srv)
+
+	if cfg.AutoloadTools {
+		scanner.Watch(func() {
+			scanner.RegisterAll(srv)
+			srv.Notify("notifications/tools/list_changed", map[string]any{})
+		})
+		fmt.Fprintf(os.Stderr, "[zeromcp] autoload_tools enabled — watching for changes\n")
 	}
 
 	srv.Serve()

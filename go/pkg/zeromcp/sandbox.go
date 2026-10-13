@@ -37,6 +37,7 @@ type SandboxOptions struct {
 // Ctx is the sandboxed context passed to tool execute functions.
 type Ctx struct {
 	Credentials any
+	Runtime     any // set per call from (*Server).SetRuntime; nil when unset
 	httpClient  *http.Client
 	toolName    string
 	permissions *Permissions

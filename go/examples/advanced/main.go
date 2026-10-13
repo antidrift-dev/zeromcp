@@ -1,4 +1,4 @@
-// Advanced example: config, permissions, HTTP transport, extended schemas.
+// Advanced example: config, permissions, extended schemas.
 // Build: go build -o my-server ./examples/advanced
 // Run:   ./my-server
 package main

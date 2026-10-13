@@ -27,9 +27,9 @@ type Registry struct {
 // currently registered on s via Tool(). Call it after all Tool() (and,
 // if used, Resource()/Prompt()) registrations are done — the same point
 // in program order you'd otherwise call Serve(). Registry does not start
-// stdio or HTTP transports; it's an alternative to Serve() for embedding
-// ZeroMCP's tools into your own HTTP framework instead of using the
-// built-in server.
+// stdio; it is how you serve ZeroMCP over HTTP: mount Routes, OpenAPI
+// and MCP in your own HTTP server. Remote tools (Config.Remote) appear
+// in MCP but never in Routes or OpenAPI.
 func (s *Server) Registry() *Registry {
 	// buildOpenAPISpec takes s.mu itself, so build the routes under the lock
 	// and release it first: re-acquiring an RLock while a writer waits deadlocks.
@@ -63,7 +63,7 @@ func (s *Server) registryRoutes() []RouteDefinition {
 			Description: rt.tool.Description,
 			Input:       rt.tool.Input,
 			Invoke: func(args map[string]any) (any, error) {
-				return rt.tool.Execute(args, rt.ctx)
+				return rt.tool.Execute(args, s.execCtx(rt))
 			},
 		})
 	}

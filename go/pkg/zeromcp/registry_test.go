@@ -193,3 +193,67 @@ func TestRegistryDoesNotDeadlockWithConcurrentTool(t *testing.T) {
 		t.Fatal("Registry() and Tool() deadlocked")
 	}
 }
+
+func TestRegistryRemoteToolsOnlyInMCP(t *testing.T) {
+	ts, _ := fakeUpstream(t)
+	s := NewServerWithConfig(Config{Remote: []RemoteServer{{Name: "probeo", URL: ts.URL, Tools: []string{"list_pages"}}}})
+	s.Tool("greet", Tool{
+		Input: Input{"name": "string"},
+		Route: &RouteConfig{Method: "GET", Path: "/greet/:name"},
+		Execute: func(args map[string]any, ctx *Ctx) (any, error) {
+			return "hi", nil
+		},
+	})
+
+	reg := s.Registry()
+	if len(reg.Routes) != 1 || reg.Routes[0].Name != "greet" {
+		t.Fatalf("expected only greet in Routes, got %+v", reg.Routes)
+	}
+	paths, _ := reg.OpenAPI["paths"].(map[string]any)
+	if len(paths) != 1 || paths["/greet/{name}"] == nil {
+		t.Errorf("expected only /greet/{name} in OpenAPI paths, got %v", paths)
+	}
+
+	var listed map[string]any
+	json.Unmarshal(reg.MCP([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)), &listed)
+	tools := listed["result"].(map[string]any)["tools"].([]any)
+	names := []string{}
+	for _, tool := range tools {
+		names = append(names, tool.(map[string]any)["name"].(string))
+	}
+	if len(names) != 2 || names[0] != "greet" || names[1] != "probeo.list_pages" {
+		t.Errorf("expected [greet probeo.list_pages] in MCP, got %v", names)
+	}
+
+	var called map[string]any
+	json.Unmarshal(reg.MCP([]byte(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"probeo.list_pages","arguments":{"domain":"x"}}}`)), &called)
+	content := called["result"].(map[string]any)["content"].([]any)
+	if text := content[0].(map[string]any)["text"]; text != `{"pages":[]}` {
+		t.Errorf("expected upstream text, got %v", text)
+	}
+}
+
+func TestRegistryRuntimeReachesRoutesAndMCP(t *testing.T) {
+	s := NewServer()
+	s.SetRuntime(func() any { return "env-value" })
+	s.Tool("whoami", Tool{
+		Input: Input{},
+		Route: &RouteConfig{Method: "GET", Path: "/whoami"},
+		Execute: func(args map[string]any, ctx *Ctx) (any, error) {
+			return ctx.Runtime, nil
+		},
+	})
+
+	reg := s.Registry()
+	got, err := reg.Routes[0].Invoke(map[string]any{})
+	if err != nil || got != "env-value" {
+		t.Errorf("Invoke: expected env-value, got %v (%v)", got, err)
+	}
+
+	var called map[string]any
+	json.Unmarshal(reg.MCP([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"whoami","arguments":{}}}`)), &called)
+	content := called["result"].(map[string]any)["content"].([]any)
+	if text := content[0].(map[string]any)["text"]; text != "env-value" {
+		t.Errorf("MCP: expected env-value, got %v", text)
+	}
+}

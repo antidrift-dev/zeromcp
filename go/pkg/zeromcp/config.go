@@ -13,19 +13,42 @@ type Config struct {
 	Logging           bool                         `json:"logging,omitempty"`
 	BypassPermissions bool                         `json:"bypass_permissions,omitempty"`
 	Separator         string                       `json:"separator,omitempty"`
-	Credentials       map[string]CredentialSource   `json:"credentials,omitempty"`
+	Credentials       map[string]CredentialSource  `json:"credentials,omitempty"`
 	CacheCredentials  *bool                        `json:"cache_credentials,omitempty"` // default true
-	ExecuteTimeout    int                          `json:"execute_timeout,omitempty"` // ms, default 30000
-	PageSize          int                          `json:"page_size,omitempty"`       // 0 = no pagination
-	Icon              string                       `json:"icon,omitempty"`            // data URI, URL, or file path (resolved at startup)
-	Title             string                       `json:"title,omitempty"`           // OpenAPI spec title (default "ZeroMCP")
+	ExecuteTimeout    int                          `json:"execute_timeout,omitempty"`   // ms, default 30000
+	PageSize          int                          `json:"page_size,omitempty"`         // 0 = no pagination
+	Icon              string                       `json:"icon,omitempty"`              // data URI, URL, or file path (resolved at startup)
+	Title             string                       `json:"title,omitempty"`             // OpenAPI spec title (default "ZeroMCP")
+	Remote            []RemoteServer               `json:"remote,omitempty"`            // upstream MCP servers whose tools are federated in
+	AutoloadTools     bool                         `json:"autoload_tools,omitempty"`    // watch tool sources and rescan on change (CLI)
+	Tools             any                          `json:"tools,omitempty"`             // string | []string | []ToolSource (mixed), like Transport
+	Namespacing       map[string]NamespaceOverride `json:"namespacing,omitempty"`       // per top-level dir prefix overrides
+	Resources         any                          `json:"resources,omitempty"`         // same shape as Tools; only path is used
+	Prompts           any                          `json:"prompts,omitempty"`           // same shape as Tools; only path is used
 }
 
-// TransportConfig defines a transport type and its settings.
+// RemoteServer is an upstream MCP server whose tools are federated in.
+type RemoteServer struct {
+	Name  string   `json:"name"`
+	URL   string   `json:"url"`
+	Auth  string   `json:"auth,omitempty"`  // literal or "env:VAR"
+	Tools []string `json:"tools,omitempty"` // allowlist of upstream names; nil = all, empty = none
+}
+
+// ToolSource is one directory to scan, with an optional name prefix.
+type ToolSource struct {
+	Path   string `json:"path"`
+	Prefix string `json:"prefix,omitempty"`
+}
+
+// NamespaceOverride overrides the prefix used for a top-level tool directory.
+type NamespaceOverride struct {
+	Prefix *string `json:"prefix,omitempty"` // nil = use dir name; "" = no prefix
+}
+
+// TransportConfig defines a transport type.
 type TransportConfig struct {
 	Type string `json:"type"`
-	Port int    `json:"port,omitempty"`
-	Auth string `json:"auth,omitempty"`
 }
 
 // CredentialSource specifies where to load credentials from.
@@ -82,6 +105,54 @@ func ResolveTransports(cfg Config) []TransportConfig {
 	return []TransportConfig{{Type: "stdio"}}
 }
 
+// checkTransports rejects the removed built-in "http" transport.
+func checkTransports(cfg Config) error {
+	for _, t := range ResolveTransports(cfg) {
+		if t.Type == "http" {
+			return fmt.Errorf(`[zeromcp] The built-in "http" transport was removed. Mount (*Server).Registry() in your own HTTP server: Routes for tool routes, OpenAPI for /openapi.json, MCP for POST /mcp. Remove the "http" entry from "transport".`)
+		}
+	}
+	return nil
+}
+
+// ResolveToolSources normalizes Config.Tools (or Resources/Prompts): a string,
+// or an array of strings and {path, prefix} objects. nil → [{Path: "./tools"}].
+func ResolveToolSources(tools any) []ToolSource {
+	if tools == nil {
+		return []ToolSource{{Path: "./tools"}}
+	}
+	data, err := json.Marshal(tools)
+	if err != nil {
+		return []ToolSource{{Path: "./tools"}}
+	}
+
+	var single string
+	if err := json.Unmarshal(data, &single); err == nil {
+		if single == "" {
+			return []ToolSource{{Path: "./tools"}}
+		}
+		return []ToolSource{{Path: single}}
+	}
+
+	var arr []json.RawMessage
+	if err := json.Unmarshal(data, &arr); err != nil {
+		return []ToolSource{{Path: "./tools"}}
+	}
+	sources := make([]ToolSource, 0, len(arr))
+	for _, el := range arr {
+		var p string
+		if err := json.Unmarshal(el, &p); err == nil {
+			sources = append(sources, ToolSource{Path: p})
+			continue
+		}
+		var src ToolSource
+		if err := json.Unmarshal(el, &src); err == nil {
+			sources = append(sources, src)
+		}
+	}
+	return sources
+}
+
 // ResolveCredentials reads a credential from the specified source.
 func ResolveCredentials(source CredentialSource) any {
 	if source.Env != "" {
@@ -116,20 +187,4 @@ func ResolveCredentials(source CredentialSource) any {
 	}
 
 	return nil
-}
-
-// ResolveAuth resolves an auth token from a string like "env:VAR_NAME" or a literal.
-func ResolveAuth(auth string) string {
-	if auth == "" {
-		return ""
-	}
-	if strings.HasPrefix(auth, "env:") {
-		envVar := auth[4:]
-		value := os.Getenv(envVar)
-		if value == "" {
-			fmt.Fprintf(os.Stderr, "[zeromcp] Warning: environment variable %s not set\n", envVar)
-		}
-		return value
-	}
-	return auth
 }

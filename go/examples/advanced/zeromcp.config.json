@@ -1,7 +1,6 @@
 {
   "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242 }
+    { "type": "stdio" }
   ],
   "logging": true,
   "bypass_permissions": false,

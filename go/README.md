@@ -1,6 +1,6 @@
 # ZeroMCP &mdash; Go
 
-Sandboxed MCP server library for Go. Register tools, call `ServeStdio()`, done.
+Sandboxed MCP server library for Go. Register tools, call `ServeStdio()`, done. For HTTP, mount `HandleRequest` or `Registry()` in your own server.
 
 ## Getting started
 
@@ -76,9 +76,13 @@ http.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 http.ListenAndServe(":4242", nil)
 ```
 
-## HTTP routes & OpenAPI docs
+For tool routes and an OpenAPI document as well, use `Registry()` (next section).
 
-Give a tool a `Route`, and it becomes a plain REST endpoint on the `http` transport &mdash; in addition to being callable over MCP:
+ZeroMCP has no built-in HTTP server. A config with an `http` transport makes `Serve()` exit at startup with an error pointing to `Registry()`.
+
+## HTTP routes & OpenAPI: `Registry()`
+
+Give a tool a `Route` and it can be mounted as a plain REST endpoint, in addition to being callable over MCP:
 
 ```go
 s.Tool("greet", zeromcp.Tool{
@@ -91,9 +95,109 @@ s.Tool("greet", zeromcp.Tool{
 })
 ```
 
-`:name`-style path segments become args. For `GET` routes, query parameters are also merged into args; for other methods, the JSON request body is merged in. A route response is `{"ok": true, "result": ...}` (200) or `{"ok": false, "error": ...}` (500).
+`s.Registry()` returns plain data for your own HTTP server: `Routes` (one entry per routed tool, with an `Invoke` func), `OpenAPI` (an OpenAPI 3.0 spec built from every routed tool's `Input`; set `"title"` in the config to name it, default `"ZeroMCP"`), and `MCP` (a JSON-RPC handler over raw bytes). Mounting it on a `net/http` `ServeMux` (Go 1.22 patterns):
 
-The server also serves `/openapi.json` (an OpenAPI 3.0 spec generated from every routed tool's `Input` schema) and `/docs` (a Swagger UI backed by that spec). Set `"title"` in `zeromcp.config.json` to name the spec (defaults to `"ZeroMCP"`).
+```go
+import (
+    "encoding/json"
+    "io"
+    "net/http"
+    "regexp"
+    "strings"
+)
+
+reg := s.Registry()
+mux := http.NewServeMux()
+
+mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(reg.OpenAPI)
+})
+
+mux.HandleFunc("POST /mcp", func(w http.ResponseWriter, r *http.Request) {
+    body, _ := io.ReadAll(r.Body)
+    out := reg.MCP(body)
+    if out == nil { // notification
+        w.WriteHeader(http.StatusNoContent)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(out)
+})
+
+param := regexp.MustCompile(`:(\w+)`)
+for _, route := range reg.Routes {
+    route := route
+    var names []string
+    pattern := param.ReplaceAllStringFunc(route.Route.Path, func(m string) string {
+        names = append(names, m[1:])
+        return "{" + m[1:] + "}"
+    })
+    method := strings.ToUpper(route.Route.Method)
+
+    mux.HandleFunc(method+" "+pattern, func(w http.ResponseWriter, r *http.Request) {
+        args := map[string]any{}
+        for _, n := range names {
+            args[n] = r.PathValue(n)
+        }
+        if method == "GET" {
+            for k, v := range r.URL.Query() {
+                args[k] = v[0]
+            }
+        } else {
+            json.NewDecoder(r.Body).Decode(&args)
+        }
+        result, err := route.Invoke(args)
+        w.Header().Set("Content-Type", "application/json")
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+            json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+            return
+        }
+        json.NewEncoder(w).Encode(result)
+    })
+}
+
+http.ListenAndServe(":4242", mux)
+```
+
+How args are built, the response shape, auth and CORS are up to you. `Registry()` snapshots `Routes` and `OpenAPI`, so call it after registering tools. `MCP` dispatches live, so it sees tools registered later.
+
+## Remote servers
+
+Federate tools from other MCP servers over HTTP. Remote tools are named `<server>.<tool>`, appear in `tools/list` and `tools/call` (stdio, `HandleRequest`, and `Registry().MCP`), and are never in `Routes` or `OpenAPI`.
+
+```go
+s := zeromcp.NewServerWithConfig(zeromcp.Config{
+    Remote: []zeromcp.RemoteServer{{
+        Name:  "probeo",
+        URL:   "https://mcp.example.com/mcp",
+        Auth:  "env:PROBEO_TOKEN",       // or a literal token; sent as "Authorization: Bearer ..."
+        Tools: []string{"list_pages"},   // optional allowlist; nil = all, empty = none
+    }},
+})
+```
+
+```json
+{ "remote": [{ "name": "probeo", "url": "https://mcp.example.com/mcp", "auth": "env:PROBEO_TOKEN", "tools": ["list_pages"] }] }
+```
+
+`NewServerWithConfig` connects to each remote (`initialize`, then `tools/list`) before it returns. A server that is not `http(s)`, that returns a non-2xx status, or that offers an unsupported type is logged and skipped. A local tool registered under the same name replaces the remote one and logs `Local tool "<name>" overrides remote`.
+
+## Runtime context
+
+`SetRuntime` installs a function called on every local tool execution. A non-nil result is exposed to the tool as `ctx.Runtime`. It applies to stdio, `HandleRequest`/`HandleRequestBytes`, and `Registry()` (`MCP` and `Routes[i].Invoke`). Remote tools ignore it.
+
+```go
+s.SetRuntime(func() any { return currentTenant() })
+
+s.Tool("whoami", zeromcp.Tool{
+    Input: zeromcp.Input{},
+    Execute: func(args map[string]any, ctx *zeromcp.Ctx) (any, error) {
+        return ctx.Runtime, nil // nil when no runtime is set
+    },
+})
+```
 
 ## Requirements
 
@@ -150,10 +254,7 @@ Optional `zeromcp.config.json`:
 
 ```json
 {
-  "transport": [
-    { "type": "stdio" },
-    { "type": "http", "port": 4242 }
-  ],
+  "transport": { "type": "stdio" },
   "logging": true,
   "bypass_permissions": false,
   "credentials": {
@@ -162,10 +263,31 @@ Optional `zeromcp.config.json`:
 }
 ```
 
-See the [root README](../README.md#configuration) for the full schema.
+`"stdio"` is the only transport. See the [root README](../README.md#configuration) for the full schema.
+
+## CLI: plugin tools, resources and prompts
+
+The `zeromcp` command (`cmd/zeromcp`) loads Go plugins (`go build -buildmode=plugin`) from directories:
+
+```json
+{
+  "tools": ["./tools", { "path": "./vendor-tools", "prefix": "vendor" }],
+  "namespacing": { "crm": { "prefix": "" }, "db": { "prefix": "data" } },
+  "separator": "_",
+  "resources": "./resources",
+  "prompts": "./prompts",
+  "autoload_tools": true
+}
+```
+
+- **`tools`**: a path, or an array of paths and `{ "path", "prefix" }` objects. The default is `./tools`, and `--tools <dir>` overrides it. Each `.so` exports `var Tool = zeromcp.PluginTool{...}`. A file in a subdirectory is named `<dir><separator><file>`, and a source `prefix` is put in front of that.
+- **`namespacing`**: overrides the prefix for a top-level directory. `""` drops it.
+- **`resources`**: every file becomes a resource. Static files are served as-is, with the URI `resource:///<relative path>` and a MIME type from the extension. A `.so` exports `var Resource = zeromcp.ResourceDef{...}` or `var ResourceTemplate = zeromcp.ResourceTemplateDef{...}`.
+- **`prompts`**: each `.so` exports `var Prompt = zeromcp.PromptDef{...}`.
+- **`autoload_tools`**: polls the tool directories once a second. When a `.so` is added or changed, the CLI rescans, registers the tools, and sends `notifications/tools/list_changed` over stdio. Tools are added or replaced, never removed. Go cannot unload or reload a plugin: `plugin.Open` returns the already-loaded plugin for a path it has opened before. So only a `.so` at a **new path** takes effect, and a plugin rebuilt in place keeps its old code until restart. Library users can call `Scanner.Watch` and `Server.Notify` themselves.
 
 ## Testing
 
 ```sh
-go test ./...
+go test ./pkg/...
 ```
