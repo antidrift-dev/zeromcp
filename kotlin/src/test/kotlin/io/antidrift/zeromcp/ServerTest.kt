@@ -676,4 +676,55 @@ class ServerTest {
         val completion = resp["result"]!!.jsonObject["completion"]!!.jsonObject
         assertTrue(completion["values"]!!.jsonArray.isEmpty())
     }
+
+    // --- Runtime context ---
+
+    @Test
+    fun `runtime provider value reaches ctx runtime`() = runBlocking {
+        val server = ZeroMcp()
+        var calls = 0
+        server.runtimeProvider = { calls++; "rt-1" }
+        server.tool("whoami") {
+            description = "Returns the runtime"
+            execute { _, ctx -> ctx.runtime }
+        }
+        val first = server.handleRequest(callRpc(1, "whoami"))
+        assertEquals("rt-1", first.firstText())
+        assertEquals(1, calls)
+        server.handleRequest(callRpc(2, "whoami"))
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `ctx runtime is null without a provider`() = runBlocking {
+        val server = ZeroMcp()
+        var seen: Any? = "unset"
+        server.tool("whoami") {
+            description = "Returns the runtime"
+            execute { _, ctx -> seen = ctx.runtime; "ok" }
+        }
+        server.handleRequest(callRpc(1, "whoami"))
+        assertNull(seen)
+    }
+
+    // --- icon / page_size from config ---
+
+    @Test
+    fun `page_size from config paginates tools list`() = runBlocking {
+        val server = ZeroMcp(ZeroMcpConfig(page_size = 1))
+        server.tool("a") { description = "a"; execute { _, _ -> null } }
+        server.tool("b") { description = "b"; execute { _, _ -> null } }
+        val result = server.handleRequest(rpc(1, "tools/list"))!!["result"]!!.jsonObject
+        assertEquals(1, result["tools"]!!.jsonArray.size)
+        assertNotNull(result["nextCursor"])
+        Unit
+    }
+
+    @Test
+    fun `icon from config appears in tools list`() = runBlocking {
+        val server = ZeroMcp(ZeroMcpConfig(icon = "data:image/png;base64,AA=="))
+        server.tool("a") { description = "a"; execute { _, _ -> null } }
+        val tool = server.handleRequest(rpc(1, "tools/list"))!!["result"]!!.jsonObject["tools"]!!.jsonArray[0].jsonObject
+        assertEquals("data:image/png;base64,AA==", tool["icons"]!!.jsonArray[0].jsonObject["uri"]!!.jsonPrimitive.content)
+    }
 }

@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RegistryTest {
@@ -20,7 +21,7 @@ class RegistryTest {
     }
 
     @Test
-    fun `routes only includes routed tools`() {
+    fun `routes only includes routed tools`() = runBlocking {
         val server = routedServer()
         server.tool("hidden") {
             description = "No route"
@@ -35,7 +36,7 @@ class RegistryTest {
     }
 
     @Test
-    fun `routes preserve insertion order`() {
+    fun `routes preserve insertion order`() = runBlocking {
         val server = ZeroMcp()
         for (n in listOf("charlie", "alpha", "bravo")) {
             server.tool(n) {
@@ -50,7 +51,7 @@ class RegistryTest {
     }
 
     @Test
-    fun `openapi matches routed tools`() {
+    fun `openapi matches routed tools`() = runBlocking {
         val server = routedServer()
         val registry = server.registry()
         val paths = registry.openapi["paths"]?.jsonObject
@@ -108,7 +109,7 @@ class RegistryTest {
     }
 
     @Test
-    fun `empty when no routed tools`() {
+    fun `empty when no routed tools`() = runBlocking {
         val server = ZeroMcp()
         server.tool("hidden") {
             description = "No route"
@@ -116,5 +117,78 @@ class RegistryTest {
         }
         val registry = server.registry()
         assertEquals(0, registry.routes.size)
+    }
+
+    @Test
+    fun `openapi documents a non-GET path param as path, not body`() = runBlocking {
+        val server = ZeroMcp()
+        server.tool("updateItem") {
+            description = "Update an item"
+            input {
+                "id" to "string"
+                "name" to "string"
+            }
+            route("PUT", "/items/:id")
+            execute { args, _ -> mapOf("id" to args.getString("id"), "name" to args.getString("name")) }
+        }
+
+        val putOp = server.registry().openapi["paths"]!!.jsonObject["/items/{id}"]!!.jsonObject["put"]!!.jsonObject
+
+        val parameters = putOp["parameters"]?.jsonArray
+        assertTrue(parameters != null && parameters.isNotEmpty(), "expected a non-empty parameters array")
+        val idParam = parameters!!.map { it.jsonObject }.first { it["name"]!!.jsonPrimitive.content == "id" }
+        assertEquals("path", idParam["in"]!!.jsonPrimitive.content)
+        assertEquals(true, idParam["required"]!!.jsonPrimitive.boolean)
+
+        val bodySchema = putOp["requestBody"]!!.jsonObject["content"]!!.jsonObject["application/json"]!!.jsonObject["schema"]!!.jsonObject
+        val bodyProps = bodySchema["properties"]!!.jsonObject
+        assertFalse(bodyProps.containsKey("id"), "path param 'id' must not be duplicated into the request body schema")
+        assertTrue(bodyProps.containsKey("name"), "non-path field 'name' must still be documented in the request body schema")
+    }
+
+    @Test
+    fun `mcp lists and calls remote tools`() = runBlocking {
+        FakeUpstream().use { up ->
+            val registry = ZeroMcp(ZeroMcpConfig(remote = listOf(RemoteServer("probeo", up.url)))).registry()
+            assertEquals("probeo.list_pages", registry.mcp(rpc(1, "tools/list")).toolNames()[0])
+            val called = registry.mcp(callRpc(2, "probeo.list_pages", buildJsonObject { put("domain", "example.com") }))
+            assertEquals(FakeUpstream.PAGES_TEXT, called.firstText())
+        }
+    }
+
+    @Test
+    fun `local tool overrides remote in the registry`() = runBlocking {
+        FakeUpstream().use { up ->
+            val server = ZeroMcp(ZeroMcpConfig(remote = listOf(RemoteServer("probeo", up.url))))
+            server.tool("probeo.list_pages") {
+                description = "local"
+                execute { _, _ -> "local override" }
+            }
+            lateinit var registry: Registry
+            val err = captureStderr { runBlocking { registry = server.registry() } }
+            assertTrue(err.contains("probeo.list_pages") && err.contains("overrides remote"), err)
+            assertEquals("local override", registry.mcp(callRpc(1, "probeo.list_pages")).firstText())
+        }
+    }
+
+    @Test
+    fun `remote tools never appear in routes or openapi`() = runBlocking {
+        FakeUpstream().use { up ->
+            val registry = ZeroMcp(ZeroMcpConfig(remote = listOf(RemoteServer("probeo", up.url)))).registry()
+            assertEquals(emptyList(), registry.routes)
+            assertEquals(JsonObject(emptyMap()), registry.openapi["paths"])
+        }
+    }
+
+    @Test
+    fun `mcp tools call sees the runtime`() = runBlocking {
+        val server = ZeroMcp()
+        server.runtimeProvider = { "env-1" }
+        server.tool("whoami") {
+            description = "Returns the runtime"
+            execute { _, ctx -> ctx.runtime }
+        }
+        val registry = server.registry()
+        assertEquals("env-1", registry.mcp(callRpc(1, "whoami")).firstText())
     }
 }

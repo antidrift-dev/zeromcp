@@ -1,13 +1,12 @@
 package io.antidrift.zeromcp
 
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
-import java.net.InetSocketAddress
 
 /**
  * ZeroMcp — zero-config MCP runtime for Kotlin.
@@ -22,8 +21,15 @@ import java.net.InetSocketAddress
  * }
  * server.serve()
  * ```
+ *
+ * ZeroMCP does not ship an HTTP server. To serve over HTTP, mount [registry]
+ * (routes, openapi, mcp) or [handleRequest] in your own HTTP framework.
  */
 class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
+
+    init {
+        if (config.transport != "stdio") throw unsupportedTransport(config.transport)
+    }
 
     private val tools = mutableMapOf<String, ToolDefinition>()
     private val schemas = mutableMapOf<String, JsonObject>()
@@ -35,11 +41,19 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
     private var logLevel: String = "info"
     private var clientCapabilities: JsonObject = JsonObject(emptyMap())
 
-    /** Optional icon URI exposed on list entries. */
-    var icon: String? = null
+    /** Optional icon URI exposed on list entries. Initialised from config `icon`. */
+    var icon: String? = resolveIcon(config.icon)
 
-    /** Page size for paginated list responses. 0 = no pagination. */
-    var pageSize: Int = 0
+    /** Page size for paginated list responses. 0 = no pagination. Initialised from config `page_size`. */
+    var pageSize: Int = config.page_size
+
+    /** Called on every local tool execution; the result is passed as ctx.runtime. */
+    var runtimeProvider: (() -> Any?)? = null
+
+    /** Names whose current entry in [tools] is a remote tool. */
+    private val remoteNames = mutableSetOf<String>()
+    private val remoteMutex = Mutex()
+    private var remotesConnected = false
 
     /**
      * Register a tool using the DSL builder.
@@ -49,6 +63,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
         builder.block()
         val tool = builder.build()
         validatePermissions(name, tool.permissions)
+        overrideRemote(name)
         tools[name] = tool
         schemas[name] = toJsonSchema(tool.input)
     }
@@ -58,15 +73,58 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
      */
     fun register(tool: ToolDefinition) {
         validatePermissions(tool.name, tool.permissions)
+        overrideRemote(tool.name)
         tools[tool.name] = tool
         schemas[tool.name] = toJsonSchema(tool.input)
     }
 
+    private fun overrideRemote(name: String) {
+        if (remoteNames.remove(name)) {
+            System.err.println("[zeromcp] Local tool \"$name\" overrides remote")
+        }
+    }
+
+    /**
+     * Connects the servers in config `remote` and merges their tools, namespaced
+     * as `<server>.<tool>`. Remote tools go first; a local tool with the same name
+     * overrides the remote one. No-op after the first call or when `remote` is empty.
+     *
+     * [serve] and [registry] call this for you. Call it once yourself before
+     * serving [handleRequest] directly.
+     */
+    suspend fun connectRemotes() {
+        remoteMutex.withLock {
+            if (remotesConnected) return
+            remotesConnected = true
+            if (config.remote.isEmpty()) return
+
+            val remote = RemoteManager().connect(config.remote)
+            val localTools = LinkedHashMap(tools)
+            val localSchemas = LinkedHashMap(schemas)
+            tools.clear()
+            schemas.clear()
+            for ((name, tool) in remote) {
+                tools[name] = tool
+                schemas[name] = toJsonSchema(tool.input)
+                remoteNames.add(name)
+            }
+            for ((name, tool) in localTools) {
+                if (remoteNames.remove(name)) {
+                    System.err.println("[zeromcp] Local tool \"$name\" overrides remote")
+                }
+                tools[name] = tool
+                schemas[name] = localSchemas[name] ?: toJsonSchema(tool.input)
+            }
+        }
+    }
+
     /**
      * Build a framework-neutral [Registry] view over the tools registered so
-     * far. Call after all `tool { ... }` / `register(...)` calls.
+     * far, plus any configured remote tools (MCP only; they have no route).
+     * Call after all `tool { ... }` / `register(...)` calls.
      */
-    fun registry(): Registry {
+    suspend fun registry(): Registry {
+        connectRemotes()
         val routeDefs = tools.values
             .filter { it.route != null }
             .map { tool ->
@@ -114,6 +172,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
      * Start the stdio JSON-RPC server. Blocks until stdin closes.
      */
     fun serve() {
+        runBlocking { connectRemotes() }
         System.err.println("[zeromcp] ${tools.size} tool(s), ${resources.size + templates.size} resource(s), ${prompts.size} prompt(s) registered")
         System.err.println("[zeromcp] stdio transport ready")
 
@@ -135,126 +194,6 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
                 System.out.flush()
             }
         }
-    }
-
-    /**
-     * Start an HTTP server on [port]. Registers /mcp (JSON-RPC POST) and any
-     * tool routes declared with route { method, path }. Blocks until the process exits.
-     */
-    fun serveHttp(port: Int = config.port) {
-        val server = HttpServer.create(InetSocketAddress(port), 0)
-
-        server.createContext("/mcp") { exchange ->
-            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
-                writeCors(exchange); return@createContext
-            }
-            if (!exchange.requestMethod.equals("POST", ignoreCase = true)) {
-                httpJson(exchange, """{"error":"Method not allowed"}""", 405); return@createContext
-            }
-            setCors(exchange)
-            val body = exchange.requestBody.readBytes()
-            val request = try {
-                json.parseToJsonElement(String(body)).jsonObject
-            } catch (_: Exception) {
-                httpJson(exchange, """{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"}}""", 200)
-                return@createContext
-            }
-            val response = runBlocking { handleRequest(request) }
-            val responseStr = if (response != null) json.encodeToString(JsonObject.serializer(), response)
-                              else """{"jsonrpc":"2.0","result":{}}"""
-            httpJson(exchange, responseStr, 200)
-        }
-
-        server.createContext("/openapi.json") { exchange ->
-            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
-                writeCors(exchange); return@createContext
-            }
-            setCors(exchange)
-            httpJson(exchange, buildOpenApiSpec(tools, schemas, config.title), 200)
-        }
-
-        server.createContext("/docs") { exchange ->
-            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
-                writeCors(exchange); return@createContext
-            }
-            setCors(exchange)
-            val html = """<!DOCTYPE html>
-<html>
-<head>
-  <title>ZeroMCP API</title>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
-<script>SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui' })</script>
-</body>
-</html>"""
-            val bytes = html.toByteArray()
-            exchange.responseHeaders.set("Content-Type", "text/html")
-            exchange.sendResponseHeaders(200, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-        }
-
-        server.createContext("/") { exchange ->
-            if (exchange.requestMethod.equals("OPTIONS", ignoreCase = true)) {
-                writeCors(exchange); return@createContext
-            }
-            setCors(exchange)
-            if (!handleToolRoute(exchange)) {
-                httpJson(exchange, """{"error":"Not found"}""", 404)
-            }
-        }
-
-        server.executor = null
-        server.start()
-        System.err.println("[zeromcp] http transport ready on port $port")
-        Thread.currentThread().join()
-    }
-
-    private fun handleToolRoute(exchange: HttpExchange): Boolean {
-        val method = exchange.requestMethod.uppercase()
-        val urlPath = exchange.requestURI.path
-
-        for ((_, tool) in tools) {
-            val route = tool.route ?: continue
-            if (route.method != method) continue
-            val pathParams = matchRoutePath(route.path, urlPath) ?: continue
-
-            val args = mutableMapOf<String, Any?>()
-            args.putAll(pathParams)
-
-            if (method == "GET") {
-                val query = exchange.requestURI.query ?: ""
-                for (pair in query.split("&")) {
-                    if (pair.isBlank()) continue
-                    val idx = pair.indexOf('=')
-                    if (idx > 0) args[pair.substring(0, idx)] = pair.substring(idx + 1)
-                }
-            } else {
-                val body = exchange.requestBody.readBytes()
-                if (body.isNotEmpty()) {
-                    try {
-                        val bodyObj = json.parseToJsonElement(String(body)).jsonObject
-                        args.putAll(bodyObj.toArgMap())
-                    } catch (_: Exception) { /* ignore malformed body */ }
-                }
-            }
-
-            val result = try {
-                runBlocking { tool.execute(args, Ctx(toolName = tool.name, permissions = tool.permissions)) }
-            } catch (e: Exception) {
-                val err = e.message?.replace("\"", "\\\"") ?: "error"
-                httpJson(exchange, """{"ok":false,"error":"$err"}""", 500)
-                return true
-            }
-            val resultJson = json.encodeToString(JsonElement.serializer(), toJsonElement(result))
-            httpJson(exchange, """{"ok":true,"result":$resultJson}""", 200)
-            return true
-        }
-        return false
     }
 
     /**
@@ -452,7 +391,8 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
                         else config.execute_timeout
 
         return try {
-            val ctx = Ctx(toolName = name, permissions = tool.permissions)
+            val runtime = if (name in remoteNames) null else runtimeProvider?.invoke()
+            val ctx = Ctx(toolName = name, permissions = tool.permissions, runtime = runtime)
             val result = withTimeout(timeoutMs) {
                 runInterruptible(Dispatchers.IO) {
                     runBlocking { tool.execute(args, ctx) }
@@ -579,31 +519,7 @@ class ZeroMcp(private val config: ZeroMcpConfig = loadConfig()) {
     }
 }
 
-// --- HTTP helpers ---
-
-private fun setCors(exchange: HttpExchange) {
-    exchange.responseHeaders.set("Access-Control-Allow-Origin", "*")
-    exchange.responseHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    exchange.responseHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-}
-
-private fun writeCors(exchange: HttpExchange) {
-    setCors(exchange)
-    exchange.sendResponseHeaders(204, -1)
-}
-
-private fun httpJson(exchange: HttpExchange, body: String, status: Int) {
-    val bytes = body.toByteArray()
-    exchange.responseHeaders.set("Content-Type", "application/json")
-    exchange.sendResponseHeaders(status, bytes.size.toLong())
-    exchange.responseBody.use { it.write(bytes) }
-}
-
 // --- OpenAPI spec builder ---
-
-internal fun buildOpenApiSpec(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): String {
-    return Json.encodeToString(JsonObject.serializer(), buildOpenApiSpecJson(tools, schemas, title))
-}
 
 internal fun buildOpenApiSpecJson(tools: Map<String, ToolDefinition>, schemas: Map<String, JsonObject>, title: String): JsonObject {
     val paths = mutableMapOf<String, Any>()
@@ -698,24 +614,6 @@ internal fun buildOpenApiSpecJson(tools: Map<String, ToolDefinition>, schemas: M
     }
 }
 
-// --- Route matching ---
-
-private fun matchRoutePath(pattern: String, urlPath: String): Map<String, String>? {
-    val patternParts = pattern.trim('/').split("/")
-    val pathParts = urlPath.trim('/').split("/")
-    if (patternParts.size != pathParts.size) return null
-    val params = mutableMapOf<String, String>()
-    for (i in patternParts.indices) {
-        val pp = patternParts[i]
-        if (pp.startsWith(":")) {
-            params[pp.substring(1)] = pathParts[i]
-        } else if (pp != pathParts[i]) {
-            return null
-        }
-    }
-    return params
-}
-
 // --- Pagination (base64 cursor) ---
 
 private data class PaginatedResult<T>(val items: List<T>, val nextCursor: String?)
@@ -758,7 +656,7 @@ private fun JsonObject.toArgMap(): Map<String, Any?> {
     return map
 }
 
-private fun jsonElementToAny(element: JsonElement): Any? = when (element) {
+internal fun jsonElementToAny(element: JsonElement): Any? = when (element) {
     is JsonNull -> null
     is JsonPrimitive -> {
         when {
@@ -775,7 +673,7 @@ private fun jsonElementToAny(element: JsonElement): Any? = when (element) {
     is JsonObject -> element.toArgMap()
 }
 
-private fun toJsonElement(value: Any?): JsonElement = when (value) {
+internal fun toJsonElement(value: Any?): JsonElement = when (value) {
     null -> JsonNull
     is String -> JsonPrimitive(value)
     is Number -> JsonPrimitive(value)
