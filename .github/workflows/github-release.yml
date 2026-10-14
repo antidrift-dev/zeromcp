@@ -27,6 +27,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
+          # The subtree pushes need the PAT; checkout's default token would be
+          # used for every later git push and is denied on the other repos.
+          token: ${{ secrets.PAT_SUBTREE }}
 
       - name: Find release notes
         run: |
