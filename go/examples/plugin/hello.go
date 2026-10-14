@@ -6,7 +6,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/antidrift-dev/zeromcp/pkg/zeromcp"
+	"github.com/antidrift-dev/zeromcp-go/pkg/zeromcp"
 )
 
 // Tool is the exported symbol that the scanner looks for.

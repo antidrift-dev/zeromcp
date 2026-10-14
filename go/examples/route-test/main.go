@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/antidrift-dev/zeromcp/pkg/zeromcp"
+	"github.com/antidrift-dev/zeromcp-go/pkg/zeromcp"
 )
 
 const swaggerHTML = `<!DOCTYPE html>

@@ -9,7 +9,7 @@ package main
 
 import (
     "fmt"
-    "github.com/antidrift-dev/zeromcp/pkg/zeromcp"
+    "github.com/antidrift-dev/zeromcp-go/pkg/zeromcp"
 )
 
 func main() {
@@ -206,7 +206,7 @@ s.Tool("whoami", zeromcp.Tool{
 ## Install
 
 ```sh
-go get github.com/antidrift-dev/zeromcp/pkg/zeromcp
+go get github.com/antidrift-dev/zeromcp-go/pkg/zeromcp
 ```
 
 ## Sandbox

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antidrift-dev/zeromcp/pkg/zeromcp"
+	"github.com/antidrift-dev/zeromcp-go/pkg/zeromcp"
 )
 
 var leaks [][]byte

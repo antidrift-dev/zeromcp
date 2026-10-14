@@ -6,7 +6,7 @@ package main
 import (
 	"time"
 
-	"github.com/antidrift-dev/zeromcp/pkg/zeromcp"
+	"github.com/antidrift-dev/zeromcp-go/pkg/zeromcp"
 )
 
 func main() {
